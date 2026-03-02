@@ -15,7 +15,22 @@ export function installQuietMode() {
 
   if (verbose) return; // Don't modify anything in verbose mode
 
-  // Only suppress console.log, keep console.error and console.warn
+  // Suppress verbose console.log AND repetitive console.warn
+  const originalWarnFn = console.warn;
+  console.warn = (...args) => {
+    const msg = args[0];
+    if (typeof msg === 'string' && msg.includes('RECONCILIATION DISCREPANCY')) {
+      // Log once per minute max
+      const now = Date.now();
+      if (!console._lastReconWarn || now - console._lastReconWarn > 60000) {
+        console._lastReconWarn = now;
+        return originalWarnFn(...args);
+      }
+      return; // suppress
+    }
+    return originalWarnFn(...args);
+  };
+
   console.log = (...args) => {
     const msg = args[0];
     if (typeof msg !== 'string') return originalLog(...args);

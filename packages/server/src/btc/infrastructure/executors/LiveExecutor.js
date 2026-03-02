@@ -542,9 +542,9 @@ export class LiveExecutor extends OrderExecutor {
       };
 
       if (reconResult.discrepancies.length > 0) {
+        // Only log count, not the full JSON (95 old positions spam the logs)
         console.warn(
           `[live] RECONCILIATION DISCREPANCY: ${reconResult.discrepancies.length} issue(s)`,
-          JSON.stringify(reconResult.discrepancies),
         );
 
         // Store as structured event for Phase 4 webhook
