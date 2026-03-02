@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.log
+data/
+logs/
+live_trading/
+paper_trading/
