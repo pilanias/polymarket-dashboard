@@ -51,6 +51,118 @@ function buildPnlSeries(trades) {
   });
 }
 
+/** Build gate status rows: [check, current, required, pass] */
+function buildGateChecks(status) {
+  if (!status) return [];
+  const rt = status.runtime || {};
+  const et = status.entryThresholds || {};
+  const g = status.guardrails || {};
+  const blockers = status.entryDebug?.blockers || [];
+  const isBlocked = (keyword) => blockers.some(b => b.toLowerCase().includes(keyword.toLowerCase()));
+
+  const pct = (v) => `${(Number(v || 0) * 100).toFixed(1)}%`;
+  const cents = (v) => `${(Number(v || 0) * 100).toFixed(1)}¢`;
+
+  return [
+    {
+      check: 'Trading Enabled',
+      current: status.tradingEnabled ? 'Yes' : 'No',
+      required: 'Yes',
+      pass: !!status.tradingEnabled,
+    },
+    {
+      check: 'Recommendation',
+      current: rt.recAction ? `${rt.recAction} ${rt.recSide || ''} (${rt.recPhase || ''})` : 'None',
+      required: 'BUY signal',
+      pass: rt.recAction === 'BUY',
+    },
+    {
+      check: 'Model Probability',
+      current: rt.modelUp != null ? `Up ${pct(rt.modelUp)} / Down ${pct(rt.modelDown)}` : '--',
+      required: `≥ ${pct(et.minModelMaxProb)}`,
+      pass: !isBlocked('strong signal') && !isBlocked('prob') && !isBlocked('conviction'),
+    },
+    {
+      check: 'RSI',
+      current: rt.rsiNow != null ? Number(rt.rsiNow).toFixed(1) : '--',
+      required: et.noTradeRsiMin != null ? `Outside [${et.noTradeRsiMin}, ${et.noTradeRsiMax}]` : '--',
+      pass: !isBlocked('rsi'),
+    },
+    {
+      check: 'Spread',
+      current: rt.spreadUp != null ? `Up ${cents(rt.spreadUp)} / Down ${cents(rt.spreadDown)}` : '--',
+      required: `≤ ${cents(et.maxSpread)}`,
+      pass: !isBlocked('spread'),
+    },
+    {
+      check: 'Entry Price',
+      current: rt.polyUp != null ? `Up ${cents(rt.polyUp)} / Down ${cents(rt.polyDown)}` : '--',
+      required: `≤ ${cents(et.maxEntryPolyPrice)}`,
+      pass: !isBlocked('entry price'),
+    },
+    {
+      check: 'Opposite Price',
+      current: '--',
+      required: `≥ ${cents(et.minOppositePolyPrice)}`,
+      pass: !isBlocked('opposite price'),
+    },
+    {
+      check: 'Liquidity',
+      current: rt.liquidityNum != null ? String(Number(rt.liquidityNum).toFixed(0)) : '--',
+      required: `≥ ${et.minLiquidity || '--'}`,
+      pass: !isBlocked('liquidity'),
+    },
+    {
+      check: 'Range (20-candle)',
+      current: rt.rangePct20 != null ? pct(rt.rangePct20) : '--',
+      required: `≥ ${pct(et.minRangePct20)}`,
+      pass: !isBlocked('choppy') && !isBlocked('range'),
+    },
+    {
+      check: 'BTC Impulse (1m)',
+      current: '--',
+      required: `≥ ${pct(et.minBtcImpulsePct1m)}`,
+      pass: !isBlocked('impulse'),
+    },
+    {
+      check: 'Candles',
+      current: String(rt.candleCount ?? '--'),
+      required: `≥ ${et.minCandlesForEntry || '--'}`,
+      pass: !isBlocked('candle'),
+    },
+    {
+      check: 'Time to Settlement',
+      current: rt.timeLeftMin != null ? `${Number(rt.timeLeftMin).toFixed(1)}m` : '--',
+      required: `> ${et.noEntryFinalMinutes || 1.5}m`,
+      pass: !isBlocked('too late'),
+    },
+    {
+      check: 'Loss Cooldown',
+      current: g.lossCooldownActive ? `${Math.ceil((g.lossCooldownRemainingMs || 0) / 1000)}s remaining` : 'Clear',
+      required: 'Clear',
+      pass: !g.lossCooldownActive,
+    },
+    {
+      check: 'Win Cooldown',
+      current: g.winCooldownActive ? `${Math.ceil((g.winCooldownRemainingMs || 0) / 1000)}s remaining` : 'Clear',
+      required: 'Clear',
+      pass: !g.winCooldownActive,
+    },
+    {
+      check: 'Circuit Breaker',
+      current: g.circuitBreakerTripped ? `Tripped (${g.consecutiveLosses} losses)` : `Clear (${g.consecutiveLosses || 0} losses)`,
+      required: 'Clear',
+      pass: !g.circuitBreakerTripped,
+    },
+    {
+      check: 'Open Position',
+      current: g.hasOpenPosition ? 'Yes' : 'No',
+      required: 'No',
+      pass: !g.hasOpenPosition,
+    },
+  ];
+}
+
 export default function Btc() {
   const { data: status, loading, refetch: refetchStatus } = useApi('/api/btc/status');
   const { data: killSwitch, refetch: refetchKill } = useApi('/api/btc/kill-switch/status');
@@ -61,6 +173,8 @@ export default function Btc() {
   const [sideFilter, setSideFilter] = useState('ALL');
   const [resultFilter, setResultFilter] = useState('ALL');
   const [pageSize, setPageSize] = useState(20);
+
+  const isTrading = !!status?.tradingEnabled;
 
   async function refreshAll() {
     await Promise.all([refetchStatus(), refetchKill(), refetchTrades(), refetchOpenOrders()]);
@@ -106,9 +220,12 @@ export default function Btc() {
   const totalTrades = Number(status?.ledgerSummary?.totalTrades || 0);
   const openTrades = status?.guardrails?.hasOpenPosition ? 1 : Number(openOrders?.length || 0);
 
+  const gateChecks = useMemo(() => buildGateChecks(status), [status]);
+
   return (
     <div className="space-y-6">
-      <section className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 p-4">
+      {/* Controls Bar */}
+      <section className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 p-4">
         <label className="text-xs uppercase tracking-wide text-slate-400" htmlFor="btc-mode">
           Mode
         </label>
@@ -124,31 +241,44 @@ export default function Btc() {
 
         <StatusPill
           label="Trading"
-          value={loading ? 'Loading' : status?.tradingEnabled ? 'ON' : 'OFF'}
-          variant={status?.tradingEnabled ? 'success' : 'danger'}
+          value={loading ? 'Loading' : isTrading ? 'ON' : 'OFF'}
+          variant={isTrading ? 'success' : 'danger'}
         />
         <StatusPill
-          label="Kill"
+          label="Kill Switch"
           value={killSwitch?.active ? 'Active' : 'Inactive'}
           variant={killSwitch?.active ? 'danger' : killSwitch?.overrideActive ? 'warning' : 'success'}
         />
 
-        <button
-          type="button"
-          onClick={startTrading}
-          className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
-        >
-          Start
-        </button>
-        <button
-          type="button"
-          onClick={stopTrading}
-          className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500"
-        >
-          Stop
-        </button>
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={startTrading}
+            disabled={isTrading}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
+              isTrading
+                ? 'cursor-not-allowed bg-slate-600 opacity-50'
+                : 'bg-emerald-600 hover:bg-emerald-500'
+            }`}
+          >
+            Start
+          </button>
+          <button
+            type="button"
+            onClick={stopTrading}
+            disabled={!isTrading}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
+              !isTrading
+                ? 'cursor-not-allowed bg-slate-600 opacity-50'
+                : 'bg-red-600 hover:bg-red-500'
+            }`}
+          >
+            Stop
+          </button>
+        </div>
       </section>
 
+      {/* Stats */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Balance" value={formatCurrency(balance)} />
         <StatCard
@@ -161,7 +291,7 @@ export default function Btc() {
         <StatCard label="Open Trades" value={String(openTrades)} />
       </section>
 
-      {/* Open Trade */}
+      {/* Active Trade */}
       {status?.openTrade && (
         <section className="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-400">Active Trade</h3>
@@ -184,7 +314,7 @@ export default function Btc() {
               <div key={label}>
                 <p className="text-slate-400">{label}</p>
                 <p className={
-                  label === 'Side' 
+                  label === 'Side'
                     ? value === 'UP' ? 'font-semibold text-emerald-400' : 'font-semibold text-red-400'
                     : 'text-slate-200'
                 }>{value}</p>
@@ -194,51 +324,102 @@ export default function Btc() {
         </section>
       )}
 
-      {/* Live Trading Status */}
-      {status && <section className="rounded-lg border border-slate-700 bg-slate-900 p-4">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Live Status</h3>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-4">
-          {[
-            ['Mode', String(status?.mode || '--')],
-            ['Market', String(status?.runtime?.marketSlug || '--').replace('btc-updown-5m-', '').slice(0, 12)],
-            ['Time Left', status?.runtime?.timeLeftMin != null ? `${Number(status.runtime.timeLeftMin).toFixed(1)}m` : '--'],
-            ['BTC', status?.runtime?.btcPrice ? `$${Number(status.runtime.btcPrice).toLocaleString()}` : '--'],
-            ['Poly UP / DOWN', status?.runtime?.polyUp != null ? `${Number(status.runtime.polyUp).toFixed(2)}¢ / ${Number(status.runtime.polyDown).toFixed(2)}¢` : '--'],
-            ['Model', status?.runtime?.modelUp != null ? `U ${(Number(status.runtime.modelUp) * 100).toFixed(1)}% / D ${(Number(status.runtime.modelDown) * 100).toFixed(1)}%` : '--'],
-            ['RSI', status?.runtime?.rsiNow != null ? Number(status.runtime.rsiNow).toFixed(1) : '--'],
-            ['Candles (1m)', String(status?.runtime?.candleCount ?? '--')],
-            ['Price Feed', status?.runtime?.lastTickAt ? 'Active' : 'Inactive'],
-            ['Entry Gate', status?.entryDebug?.eligible ? 'Open' : 'Blocked'],
-            ['Schedule', status?.entryThresholds?.isWeekend ? `Weekend (${status.entryThresholds.pacificDay})` : `Weekday (${status.entryThresholds.pacificDay ?? '--'})`],
-            ['Gate Status', status?.entryDebug?.blockers?.length ? status.entryDebug.blockers.join(', ') : 'Clear'],
-            ['Guardrails', (() => {
-              const g = status?.guardrails;
-              if (!g) return '--';
-              const items = [];
-              if (g.lossCooldownActive) items.push(`Loss CD ${Math.ceil(g.lossCooldownRemainingMs / 1000)}s`);
-              if (g.winCooldownActive) items.push(`Win CD ${Math.ceil(g.winCooldownRemainingMs / 1000)}s`);
-              if (g.circuitBreakerTripped) items.push('Circuit Breaker');
-              if (g.hasOpenPosition) items.push('Open Position');
-              return items.length ? items.join(', ') : 'Clear';
-            })()],
-            ['Kill Switch', status?.killSwitch?.active ? `Active (PnL $${Number(status.killSwitch.todayPnl).toFixed(2)} / -$${Number(status.killSwitch.limit).toFixed(0)})` : 'Inactive'],
-            ['Rec', status?.runtime?.recAction ? `${status.runtime.recAction} ${status.runtime.recSide ?? ''} (${status.runtime.recPhase ?? ''})` : 'None'],
-            ['Spread UP/DN', status?.runtime?.spreadUp != null ? `${Number(status.runtime.spreadUp).toFixed(1)}¢ / ${Number(status.runtime.spreadDown).toFixed(1)}¢` : '--'],
-          ].map(([label, value]) => (
-            <div key={label} className="flex justify-between border-b border-slate-800 py-1">
-              <span className="text-slate-400">{label}</span>
-              <span className={
-                value === 'Active' || value === 'Open' || value === 'Clear'
-                  ? 'text-emerald-400'
-                  : value === 'Blocked' || value === 'Inactive' || value.startsWith('Active (')
-                    ? 'text-amber-400'
-                    : 'text-slate-200'
-              }>{value}</span>
+      {/* Live Market Info */}
+      {status && (
+        <section className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Market</h3>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-4">
+            <div>
+              <p className="text-slate-400">Market</p>
+              <p className="text-slate-200">
+                {status.runtime?.marketSlug ? (
+                  <a
+                    href={`https://polymarket.com/event/${status.runtime.marketSlug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline"
+                  >
+                    {status.runtime.marketSlug.replace('btc-updown-5m-', '5m-')}
+                  </a>
+                ) : '--'}
+              </p>
             </div>
-          ))}
-        </div>
-      </section>}
+            <div>
+              <p className="text-slate-400">Time Left</p>
+              <p className="text-slate-200">{status.runtime?.timeLeftMin != null ? `${Number(status.runtime.timeLeftMin).toFixed(1)}m` : '--'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">BTC Price</p>
+              <p className="text-slate-200">{status.runtime?.btcPrice ? `$${Number(status.runtime.btcPrice).toLocaleString()}` : '--'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Poly Up / Down</p>
+              <p className="text-slate-200">
+                {status.runtime?.polyUp != null
+                  ? `${(Number(status.runtime.polyUp) * 100).toFixed(1)}¢ / ${(Number(status.runtime.polyDown) * 100).toFixed(1)}¢`
+                  : '--'}
+              </p>
+            </div>
+            <div>
+              <p className="text-slate-400">Model</p>
+              <p className="text-slate-200">
+                {status.runtime?.modelUp != null
+                  ? `Up ${(Number(status.runtime.modelUp) * 100).toFixed(1)}% / Down ${(Number(status.runtime.modelDown) * 100).toFixed(1)}%`
+                  : '--'}
+              </p>
+            </div>
+            <div>
+              <p className="text-slate-400">RSI</p>
+              <p className="text-slate-200">{status.runtime?.rsiNow != null ? Number(status.runtime.rsiNow).toFixed(1) : '--'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Candles (1m)</p>
+              <p className="text-slate-200">{String(status.runtime?.candleCount ?? '--')}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Schedule</p>
+              <p className="text-slate-200">
+                {status.entryThresholds?.pacificDay ?? '--'} {status.entryThresholds?.pacificHour != null ? `${status.entryThresholds.pacificHour}:00 PT` : ''}
+                {status.entryThresholds?.isWeekend ? ' (Weekend)' : ''}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
+      {/* Gate Status Table */}
+      {status && (
+        <section className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Gate Status</h3>
+          <div className="overflow-x-auto rounded-md border border-slate-700">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-800 text-left text-slate-200">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Check</th>
+                  <th className="px-4 py-2 font-medium">Current</th>
+                  <th className="px-4 py-2 font-medium">Required</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gateChecks.map((row, i) => (
+                  <tr key={row.check} className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-950'}>
+                    <td className="px-4 py-2 text-slate-300">{row.check}</td>
+                    <td className={`px-4 py-2 font-medium ${row.pass ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {row.current}
+                    </td>
+                    <td className="px-4 py-2 text-slate-400">{row.required}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {status.entryDebug?.eligible && (
+            <p className="mt-2 text-sm font-medium text-emerald-400">✓ Entry gate is open — ready to trade</p>
+          )}
+        </section>
+      )}
+
+      {/* Chart / Trades Tabs */}
       <section className="rounded-lg border border-slate-700 bg-slate-900">
         <div className="flex gap-2 border-b border-slate-700 p-3">
           <button

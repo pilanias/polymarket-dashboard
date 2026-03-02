@@ -138,20 +138,27 @@ export default function Weather() {
           variant={status?.tradingEnabled ? 'success' : 'danger'}
         />
 
-        <button
-          type="button"
-          onClick={handleTick}
-          className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
-        >
-          Start Tick
-        </button>
-        <button
-          type="button"
-          onClick={handleKill}
-          className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500"
-        >
-          Kill
-        </button>
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={handleTick}
+            disabled={!status || status.tradingEnabled === false}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
+              status?.tradingEnabled === false
+                ? 'cursor-not-allowed bg-slate-600 opacity-50'
+                : 'bg-emerald-600 hover:bg-emerald-500'
+            }`}
+          >
+            Start
+          </button>
+          <button
+            type="button"
+            onClick={handleKill}
+            className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500"
+          >
+            Stop
+          </button>
+        </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
