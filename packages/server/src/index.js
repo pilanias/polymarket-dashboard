@@ -72,7 +72,17 @@ async function boot() {
 
   // 2. Serve React build (must be AFTER API routes, BEFORE engine init)
   const clientDistPath = path.resolve(__dirname, "../../client/dist");
-  app.use(express.static(clientDistPath));
+  console.log(`[Boot] Serving static files from: ${clientDistPath}`);
+
+  // Check if the dist directory exists
+  const fs = await import("node:fs");
+  if (fs.existsSync(clientDistPath)) {
+    console.log(`[Boot] Static directory exists, files: ${fs.readdirSync(clientDistPath).join(', ')}`);
+  } else {
+    console.error(`[Boot] WARNING: Static directory does not exist: ${clientDistPath}`);
+  }
+
+  app.use(express.static(clientDistPath, { maxAge: '1h' }));
   app.get("/{*path}", (_req, res) => {
     res.sendFile(path.join(clientDistPath, "index.html"));
   });

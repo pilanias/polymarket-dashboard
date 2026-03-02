@@ -6,7 +6,7 @@ services:
       repo: ElijahPrince73/polymarket-dashboard
       branch: main
       deploy_on_push: true
-    build_command: npm install && npm run build
+    build_command: npm install --workspaces && npm run build && ls -la packages/client/dist/
     run_command: npm start
     environment_slug: node-js
     instance_count: 1
