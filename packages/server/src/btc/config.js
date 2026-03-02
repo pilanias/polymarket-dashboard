@@ -77,9 +77,11 @@ export const CONFIG = {
 
     // Bankroll + position sizing
     startingBalance: Number(process.env.STARTING_BALANCE) || 1000,
-    stakePct: Number(process.env.STAKE_PCT) || 0.08, // 8% of balance per trade
-    minTradeUsd: Number(process.env.MIN_TRADE_USD) || 25,
-    maxTradeUsd: Number(process.env.MAX_TRADE_USD) || 250,
+    // Raised from 8% to 12%: at $1,139 balance this means ~$137/trade instead of ~$91.
+    // As balance grows, trades scale automatically. Floor $50, ceiling $300.
+    stakePct: Number(process.env.STAKE_PCT) || 0.12, // 12% of balance per trade
+    minTradeUsd: Number(process.env.MIN_TRADE_USD) || 50,
+    maxTradeUsd: Number(process.env.MAX_TRADE_USD) || 300,
 
     // Back-compat (legacy fixed size). If stakePct is set, we use dynamic sizing.
     contractSize: Number(process.env.PAPER_CONTRACT_SIZE) || 100,
@@ -199,18 +201,20 @@ export const CONFIG = {
     trailingTakeProfitEnabled:
       (process.env.TRAILING_TAKE_PROFIT_ENABLED || 'true').toLowerCase() ===
       'true',
-    // Raised from $3 to $4: 21 trades peaked at avg $3.61 then reversed to losses.
-    // Premature trailing activation at $3 was causing false exits.
-    trailingStartUsd: Number(process.env.TRAILING_TAKE_PROFIT_START_USD) || 4,
+    // Raised from $4 to $5: with larger contracts, the $4 start was activating
+    // on small peaks. $5 gives more room before trailing kicks in.
+    trailingStartUsd: Number(process.env.TRAILING_TAKE_PROFIT_START_USD) || 5,
     // Base drawdown for profits $4-8. Tiered drawdown scales up for bigger winners.
     trailingDrawdownUsd:
       Number(process.env.TRAILING_TAKE_PROFIT_DRAWDOWN_USD) || 2.00,
 
     // Tiered trailing drawdown: ride bigger winners with more room.
     // Sorted descending by threshold. First match wins.
-    // Win capture was 63% — leaving ~$4/trade on table. Tiers let big winners breathe.
+    // Larger contracts mean bigger absolute PnL swings — tiers scaled up.
+    // Base drawdown stays at $2.00 (Polymarket fluctuates a lot).
     trailingDrawdownTiers: [
-      { above: 15, dd: 4.0 },  // PnL >$15: give $4 room (ride the big ones)
+      { above: 25, dd: 5.0 },  // PnL >$25: give $5 room (ride the monsters)
+      { above: 15, dd: 4.0 },  // PnL $15-25: give $4 room
       { above: 8, dd: 3.0 },   // PnL $8-15: give $3 room
       // Below $8: uses base trailingDrawdownUsd ($2.00)
     ],
