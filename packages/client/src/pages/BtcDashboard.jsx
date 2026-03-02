@@ -50,7 +50,7 @@ export default function BtcDashboard() {
     pnl: Number(point.pnl ?? 0),
   }));
 
-  const currentPnl = Number(status.pnl ?? status.totalPnl ?? analytics.totalPnl ?? 0);
+  const currentPnl = Number(status.balance?.realized ?? status.ledgerSummary?.totalPnL ?? analytics.totalPnl ?? 0);
 
   if (statusQuery.loading || tradesQuery.loading || analyticsQuery.loading) {
     return <p className="text-slate-300">Loading...</p>;
@@ -72,9 +72,9 @@ export default function BtcDashboard() {
           <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Trading Status</p>
           <StatusBadge status={status.tradingEnabled ? 'Running' : status.mode || 'Unknown'} />
         </div>
-        <StatCard label="Current Position" value={status.position ?? status.currentPosition ?? 'Flat'} />
-        <StatCard label="Total P&L" value={currency(currentPnl)} color={currentPnl >= 0 ? 'profit' : 'loss'} />
-        <StatCard label="Trades" value={status.tradeCount ?? trades.length ?? 0} />
+        <StatCard label="Balance" value={currency(status.balance?.balance ?? 0)} />
+        <StatCard label="Realized P&L" value={currency(currentPnl)} color={currentPnl >= 0 ? 'profit' : 'loss'} />
+        <StatCard label="Trades" value={status.ledgerSummary?.totalTrades ?? trades.length ?? 0} trend={`Mode: ${status.mode ?? '—'}`} />
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
@@ -101,7 +101,7 @@ export default function BtcDashboard() {
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
           <h3 className="mb-3 text-lg font-semibold">Current Config</h3>
           <pre className="max-h-64 overflow-auto rounded-md bg-slate-950 p-3 text-xs text-slate-300">
-            {JSON.stringify(status.config || analytics.config || {}, null, 2)}
+            {JSON.stringify(status.entryThresholds || status.paperTrading || {}, null, 2)}
           </pre>
         </div>
 

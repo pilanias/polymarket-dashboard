@@ -51,39 +51,50 @@ async function boot() {
   console.log("=== Polymarket Dashboard ===");
   console.log(`Starting on port ${port}...`);
 
-  // 1. Mount BTC routes + initialize trading engine
+  // 1. Mount ALL routes first (before any engine initialization)
+  let btc, weather;
   try {
-    const btc = await import("./btc/boot.js");
+    btc = await import("./btc/boot.js");
     btc.mountRoutes(app);
-    await btc.initialize();
-    console.log("[Boot] BTC trader initialized");
   } catch (err) {
-    console.error("[Boot] BTC trader failed to initialize:", err.message);
-    console.error(err.stack);
+    console.error("[Boot] BTC route mounting failed:", err.message);
   }
-
-  // 2. Mount Weather routes + initialize tick loop
   try {
-    const weather = await import("./weather/boot.js");
+    weather = await import("./weather/boot.js");
     weather.mountRoutes(app);
-    await weather.initialize();
-    console.log("[Boot] Weather bot initialized");
   } catch (err) {
-    console.error("[Boot] Weather bot failed to initialize:", err.message);
-    console.error(err.stack);
+    console.error("[Boot] Weather route mounting failed:", err.message);
   }
 
-  // 3. Serve React build in production
+  // 2. Serve React build (must be AFTER API routes, BEFORE engine init)
   const clientDistPath = path.resolve(__dirname, "../../client/dist");
   app.use(express.static(clientDistPath));
   app.get("/{*path}", (_req, res) => {
     res.sendFile(path.join(clientDistPath, "index.html"));
   });
 
-  // 4. Start listening
+  // 3. Start listening
   const server = app.listen(port, "0.0.0.0", () => {
     console.log(`\n=== Dashboard running on http://localhost:${port} ===\n`);
   });
+
+  // 4. Initialize trading engines (after server is listening, routes are ready)
+  if (btc) {
+    try {
+      await btc.initialize();
+      console.log("[Boot] BTC trader initialized");
+    } catch (err) {
+      console.error("[Boot] BTC trader failed to initialize:", err.message);
+    }
+  }
+  if (weather) {
+    try {
+      await weather.initialize();
+      console.log("[Boot] Weather bot initialized");
+    } catch (err) {
+      console.error("[Boot] Weather bot failed to initialize:", err.message);
+    }
+  }
 
   // 5. Graceful shutdown
   async function handleShutdown(signal) {
