@@ -40,6 +40,18 @@ export async function initialize() {
   }
 
   console.log("[BTC] Initialized — trading loop running in background, tradingEnabled:", _engine?.tradingEnabled);
+
+  // Watchdog: check every 60s if trading was unexpectedly disabled.
+  // Logs when it re-enables so we can track what's turning it off.
+  if (autoStart && _engine) {
+    setInterval(() => {
+      if (!_engine.tradingEnabled && !_engine._manuallyDisabled) {
+        _engine.tradingEnabled = true;
+        console.warn("[BTC] Watchdog: trading was disabled unexpectedly — re-enabled");
+      }
+    }, 60_000);
+  }
+
   return { engine: _engine, modeManager: _modeManager };
 }
 

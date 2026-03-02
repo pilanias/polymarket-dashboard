@@ -537,6 +537,7 @@ export default function Btc() {
                     <th className="px-3 py-2">Entry Price</th>
                     <th className="px-3 py-2">Exit Price</th>
                     <th className="px-3 py-2">PnL</th>
+                    <th className="px-3 py-2">Settlement</th>
                     <th className="px-3 py-2">Exit Reason</th>
                   </tr>
                 </thead>
@@ -555,6 +556,14 @@ export default function Btc() {
                         <td className="px-3 py-2">{formatCurrency(trade.exitPrice)}</td>
                         <td className={`px-3 py-2 ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {formatCurrency(pnl)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {trade.settlementSide
+                            ? <span className={trade.directionCorrect ? 'text-emerald-400' : 'text-red-400'}>
+                                {trade.settlementSide} {trade.directionCorrect ? '✅' : '❌'}
+                              </span>
+                            : <span className="text-slate-500">--</span>
+                          }
                         </td>
                         <td className="px-3 py-2">{String(trade.exitReason || '--')}</td>
                       </tr>

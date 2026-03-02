@@ -843,6 +843,7 @@ router.post('/trading/start', (req, res) => {
   const engine = globalThis.__tradingEngine;
   if (!engine) return res.status(503).json(fail('Engine not initialized'));
   engine.tradingEnabled = true;
+  engine._manuallyDisabled = false; // Clear manual stop flag
   res.json(ok({ tradingEnabled: true }));
 });
 
@@ -850,6 +851,7 @@ router.post('/trading/stop', (req, res) => {
   const engine = globalThis.__tradingEngine;
   if (!engine) return res.status(503).json(fail('Engine not initialized'));
   engine.tradingEnabled = false;
+  engine._manuallyDisabled = true; // Prevent watchdog from re-enabling
   res.json(ok({ tradingEnabled: false }));
 });
 

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { CONFIG } from '../config.js';
-import { initializeLedger, getLedger, recalculateSummary, getOpenTrade } from '../paper_trading/ledger.js';
+import { initializeLedger, getLedger, recalculateSummary } from '../paper_trading/ledger.js';
+import { getOpenTrade } from '../paper_trading/trader.js';
 import { fetchCollateralBalance } from '../live_trading/clob.js';
 import { getLiveLedger } from '../live_trading/ledger.js';
 import { getPacificTimeInfo } from '../domain/entryGate.js';
