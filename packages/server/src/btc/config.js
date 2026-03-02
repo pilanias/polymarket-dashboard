@@ -90,15 +90,17 @@ export const CONFIG = {
     // 5m defaults tuned for higher-frequency paper trading
     // Raised from 0.52/0.53/0.55 based on 84-trade analysis:
     // entries at >60¢ (higher conviction) had 63% WR vs 27% at <40¢.
-    minProbEarly: Number(process.env.MIN_PROB_EARLY) || 0.57,
-    minProbMid: Number(process.env.MIN_PROB_MID) || 0.58,
-    minProbLate: Number(process.env.MIN_PROB_LATE) || 0.60,
+    // Loosened for high-frequency: bet on almost every market
+    minProbEarly: Number(process.env.MIN_PROB_EARLY) || 0.52,
+    minProbMid: Number(process.env.MIN_PROB_MID) || 0.53,
+    minProbLate: Number(process.env.MIN_PROB_LATE) || 0.55,
 
     // Lowered from 0.02 to 0.015: 84% of trades are EARLY phase with PF near 1.0.
     // Slightly looser edge lets more volume through where timing advantage is highest.
-    edgeEarly: Number(process.env.EDGE_EARLY) || 0.015,
-    edgeMid: Number(process.env.EDGE_MID) || 0.03,
-    edgeLate: Number(process.env.EDGE_LATE) || 0.05,
+    // Minimal edge requirements — let volume flow
+    edgeEarly: Number(process.env.EDGE_EARLY) || 0.005,
+    edgeMid: Number(process.env.EDGE_MID) || 0.01,
+    edgeLate: Number(process.env.EDGE_LATE) || 0.02,
 
     // Extra strictness knobs (used to improve odds without killing trade count)
     // MID entries tend to be weaker; require a bit more strength.
@@ -155,9 +157,9 @@ export const CONFIG = {
       ).toLowerCase() === 'true',
 
     // Cooldown after a losing trade (seconds): prevents rapid back-to-back losses.
-    lossCooldownSeconds: Number(process.env.LOSS_COOLDOWN_SECONDS) || 30,
-    // Cooldown after a winning trade (seconds): reduces bursty trade patterns (safer for live).
-    winCooldownSeconds: Number(process.env.WIN_COOLDOWN_SECONDS) || 30,
+    // Reduced cooldowns for high-frequency
+    lossCooldownSeconds: Number(process.env.LOSS_COOLDOWN_SECONDS) || 10,
+    winCooldownSeconds: Number(process.env.WIN_COOLDOWN_SECONDS) || 10,
 
     // Daily loss limit: kill-switch threshold (applies to BOTH paper and live modes)
     // Alias: DAILY_LOSS_LIMIT overrides LIVE_MAX_DAILY_LOSS_USD for unified behavior
@@ -173,12 +175,14 @@ export const CONFIG = {
 
     // Circuit breaker: after N consecutive losses, pause entries for a cooldown period.
     // Set to 0 to disable.
-    circuitBreakerConsecutiveLosses: Number(process.env.CIRCUIT_BREAKER_LOSSES) || 5,
-    circuitBreakerCooldownMs: Number(process.env.CIRCUIT_BREAKER_COOLDOWN_MS) || 5 * 60_000, // 5 minutes
+    // Loosened circuit breaker
+    circuitBreakerConsecutiveLosses: Number(process.env.CIRCUIT_BREAKER_LOSSES) || 8,
+    circuitBreakerCooldownMs: Number(process.env.CIRCUIT_BREAKER_COOLDOWN_MS) || 2 * 60_000, // 2 minutes
 
     // If true: after a Max Loss stopout, do not enter again until the market rolls to the next slug.
+    // Disabled: don't skip markets after a loss — trade the next opportunity
     skipMarketAfterMaxLoss:
-      (process.env.SKIP_MARKET_AFTER_MAX_LOSS || 'true').toLowerCase() ===
+      (process.env.SKIP_MARKET_AFTER_MAX_LOSS || 'false').toLowerCase() ===
       'true',
 
     // Stop loss (disabled by default for 5m; rollover + chop made it a big drag)
@@ -245,7 +249,8 @@ export const CONFIG = {
     // Max allowed Polymarket orderbook spread (dollars). 0.008 = 0.8¢
     // Tighten spread for better fills
     // Tightened to reduce adverse selection / churn in wide markets
-    maxSpread: Number(process.env.MAX_SPREAD) || 0.012,
+    // Widened for high-frequency
+    maxSpread: Number(process.env.MAX_SPREAD) || 0.025,
 
     // Trading schedule filter (America/Los_Angeles)
     // If enabled, blocks weekend entries (with optional Sunday exception).
@@ -275,7 +280,8 @@ export const CONFIG = {
     // Spot impulse filter (uses Coinbase spot as reference)
     // Require the BTC spot price to have moved at least this much over the last 60s.
     // Set to 0 to disable.
-    minBtcImpulsePct1m: Number(process.env.MIN_BTC_IMPULSE_PCT_1M) || 0.0003, // 0.03%
+    // Lowered: don't require much movement to enter
+    minBtcImpulsePct1m: Number(process.env.MIN_BTC_IMPULSE_PCT_1M) || 0.0001, // 0.01%
 
     // Volume filters (set to 0 to disable)
     // volumeRecent is sum of last 20x 1m candle volumes
@@ -287,27 +293,27 @@ export const CONFIG = {
     // Polymarket prices are decimal (0–1): 0.56 = 56¢.
     // Avoid dust prices where spread/tick noise dominates.
     // Raised from 0.35 to 0.40: entries below 40¢ had 29% WR and -$107 PnL across 38 trades (234-trade analysis).
-    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.40,
+    // Widened for high-frequency: allow more price ranges
+    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.20,
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
-    // Profitability filter: cap entry price to avoid overpaying.
-    // For 5m BTC markets, prices hover around 0.45–0.55 (45–55¢).
-    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.65,
-    // Avoid extremely skewed markets where one side is near-zero.
-    minOppositePolyPrice: Number(process.env.MIN_OPPOSITE_POLY_PRICE) || 0.10,
+    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.80,
+    minOppositePolyPrice: Number(process.env.MIN_OPPOSITE_POLY_PRICE) || 0.05,
 
     // Chop/volatility filter (BTC reference): block entries when recent movement is too small.
     // rangePct20 = (max(close,last20) - min(close,last20)) / lastClose
     // Moderate default: require ~0.20% range over last 20 minutes.
     // More permissive for 5m (higher frequency): require ~0.12% range over last 20 minutes.
-    minRangePct20: Number(process.env.MIN_RANGE_PCT_20) || 0.0012,
+    // Lowered: allow quieter markets
+    minRangePct20: Number(process.env.MIN_RANGE_PCT_20) || 0.0005,
 
     // Confidence filter: avoid coin-flip markets where the model is near 50/50.
     // We require max(modelUp, modelDown) >= this value to allow entries.
-    minModelMaxProb: Number(process.env.MIN_MODEL_MAX_PROB) || 0.53,
+    // Lowered: allow near-50/50 markets
+    minModelMaxProb: Number(process.env.MIN_MODEL_MAX_PROB) || 0.51,
 
-    // RSI consolidation/regime filter: enabled for profitability (avoid bad band)
-    noTradeRsiMin: Number(process.env.NO_TRADE_RSI_MIN) || 30,
-    noTradeRsiMax: Number(process.env.NO_TRADE_RSI_MAX) || 45,
+    // RSI consolidation filter: disabled for high-frequency trading
+    noTradeRsiMin: Number(process.env.NO_TRADE_RSI_MIN) || 0,
+    noTradeRsiMax: Number(process.env.NO_TRADE_RSI_MAX) || 0,
 
     // RSI overbought/oversold directional filter
     noTradeRsiOverbought: Number(process.env.NO_TRADE_RSI_OVERBOUGHT) || 78,
@@ -316,8 +322,9 @@ export const CONFIG = {
     // RSI directional bias: align trade direction with momentum.
     // RSI < 40 → only DOWN allowed. RSI > 60 → only UP allowed.
     // 234-trade data: RSI<40 UP entries were worst performers.
+    // Disabled for high-frequency — let both sides trade freely
     rsiDirectionalBiasEnabled:
-      (process.env.RSI_DIRECTIONAL_BIAS_ENABLED || 'true').toLowerCase() === 'true',
+      (process.env.RSI_DIRECTIONAL_BIAS_ENABLED || 'false').toLowerCase() === 'true',
     rsiBearishThreshold: Number(process.env.RSI_BEARISH_THRESHOLD) || 40,
     // Raised from 60 to 65: RSI>60 UP had 42 trades at -$7 PnL. Cuts marginal entries.
     rsiBullishThreshold: Number(process.env.RSI_BULLISH_THRESHOLD) || 65,
@@ -325,23 +332,26 @@ export const CONFIG = {
     // Heiken Ashi exhaustion filter: block entries when HA count is 4-6.
     // 157-trade data: count 4-6 had 38% WR, -$35. Count 2-3 best (54% WR, +$112).
     // Count 7+ allowed (strong trend, 53% WR).
+    // Disabled for high-frequency
     heikenExhaustionFilterEnabled:
-      (process.env.HEIKEN_EXHAUSTION_FILTER_ENABLED || 'true').toLowerCase() === 'true',
+      (process.env.HEIKEN_EXHAUSTION_FILTER_ENABLED || 'false').toLowerCase() === 'true',
     // Narrowed from 4 to 5: count 4 was borderline, allow it through. Block only 5-6.
     heikenExhaustionMin: Number(process.env.HEIKEN_EXHAUSTION_MIN) || 5,
     heikenExhaustionMax: Number(process.env.HEIKEN_EXHAUSTION_MAX) || 6,
 
     // Require at least one strong signal: model prob >= 80% OR edge >= 8%.
     // 157-trade data: 60-80% prob with <8% edge was bleeding money.
+    // Disabled: was blocking 63% of ticks. Probability + edge thresholds handle filtering now.
     requireStrongSignalEnabled:
-      (process.env.REQUIRE_STRONG_SIGNAL_ENABLED || 'true').toLowerCase() === 'true',
+      (process.env.REQUIRE_STRONG_SIGNAL_ENABLED || 'false').toLowerCase() === 'true',
     // Loosened further: still blocking 80% of ticks at 0.70/0.06. 0.65/0.04 should open more volume.
     strongProbThreshold: Number(process.env.STRONG_PROB_THRESHOLD) || 0.65,
     strongEdgeThreshold: Number(process.env.STRONG_EDGE_THRESHOLD) || 0.04,
 
     // Time filters
     // For 5m, avoid new entries too close to settlement (rollover risk)
-    noEntryFinalMinutes: Number(process.env.NO_ENTRY_FINAL_MIN) || 1.5,
+    // Allow entries closer to settlement
+    noEntryFinalMinutes: Number(process.env.NO_ENTRY_FINAL_MIN) || 1.0,
 
     // Require enough 1m candles before allowing entries (helps avoid 50/50 startup)
     minCandlesForEntry: Number(process.env.MIN_CANDLES_FOR_ENTRY) || 12,
