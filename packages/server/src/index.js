@@ -76,7 +76,7 @@ async function boot() {
   // 3. Serve React build in production
   const clientDistPath = path.resolve(__dirname, "../../client/dist");
   app.use(express.static(clientDistPath));
-  app.get("*", (_req, res) => {
+  app.get("/{*path}", (_req, res) => {
     res.sendFile(path.join(clientDistPath, "index.html"));
   });
 

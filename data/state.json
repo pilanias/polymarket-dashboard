@@ -1,0 +1,16 @@
+{
+  "killSwitch": {
+    "active": false,
+    "overrideActive": false,
+    "overrideCount": 0,
+    "overrideLog": [],
+    "lastResetDate": null
+  },
+  "todayRealizedPnl": 0,
+  "consecutiveLosses": 0,
+  "circuitBreakerTrippedAtMs": null,
+  "hasOpenPosition": false,
+  "_todayKey": null,
+  "_savedAt": "2026-03-02T01:42:06.867Z",
+  "_pid": 5862
+}
