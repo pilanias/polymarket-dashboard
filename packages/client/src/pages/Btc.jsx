@@ -161,6 +161,39 @@ export default function Btc() {
         <StatCard label="Open Trades" value={String(openTrades)} />
       </section>
 
+      {/* Open Trade */}
+      {status?.openTrade && (
+        <section className="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-400">Active Trade</h3>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              ['Side', String(status.openTrade.side || '--')],
+              ['Entry Price', formatCurrency(status.openTrade.entryPrice)],
+              ['Shares', String(Number(status.openTrade.shares || 0).toFixed(2))],
+              ['Contract Size', formatCurrency(status.openTrade.contractSize)],
+              ['Entry Time', formatTime(status.openTrade.entryTime || status.openTrade.timestamp)],
+              ['Entry Phase', String(status.openTrade.entryPhase || '--')],
+              ['Unrealized P&L', (() => {
+                const mfe = Number(status.openTrade.maxUnrealizedPnl || 0);
+                const mae = Number(status.openTrade.minUnrealizedPnl || 0);
+                return `MFE $${mfe.toFixed(2)} / MAE $${mae.toFixed(2)}`;
+              })()],
+              ['Market', String(status.openTrade.marketSlug || status.runtime?.marketSlug || '--').replace('btc-updown-5m-', '')],
+              ['Entry Reason', String(status.openTrade.entryReason || '--')],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-slate-400">{label}</p>
+                <p className={
+                  label === 'Side' 
+                    ? value === 'UP' ? 'font-semibold text-emerald-400' : 'font-semibold text-red-400'
+                    : 'text-slate-200'
+                }>{value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Live Trading Status */}
       {status && <section className="rounded-lg border border-slate-700 bg-slate-900 p-4">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Live Status</h3>
