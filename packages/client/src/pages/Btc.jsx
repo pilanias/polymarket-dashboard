@@ -161,6 +161,51 @@ export default function Btc() {
         <StatCard label="Open Trades" value={String(openTrades)} />
       </section>
 
+      {/* Live Trading Status */}
+      <section className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Live Status</h3>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-4">
+          {[
+            ['Mode', String(status?.mode || '--')],
+            ['Market', String(status?.runtime?.marketSlug || '--').replace('btc-updown-5m-', '').slice(0, 12)],
+            ['Time Left', status?.runtime?.timeLeftMin != null ? `${Number(status.runtime.timeLeftMin).toFixed(1)}m` : '--'],
+            ['BTC', status?.runtime?.btcPrice ? `$${Number(status.runtime.btcPrice).toLocaleString()}` : '--'],
+            ['Poly UP / DOWN', status?.runtime?.polyUp != null ? `${Number(status.runtime.polyUp).toFixed(2)}¢ / ${Number(status.runtime.polyDown).toFixed(2)}¢` : '--'],
+            ['Model', status?.runtime?.modelUp != null ? `U ${(Number(status.runtime.modelUp) * 100).toFixed(1)}% / D ${(Number(status.runtime.modelDown) * 100).toFixed(1)}%` : '--'],
+            ['RSI', status?.runtime?.rsiNow != null ? Number(status.runtime.rsiNow).toFixed(1) : '--'],
+            ['Candles (1m)', String(status?.runtime?.candleCount ?? '--')],
+            ['Price Feed', status?.runtime?.lastTickAt ? 'Active' : 'Inactive'],
+            ['Entry Gate', status?.entryDebug?.eligible ? 'Open' : 'Blocked'],
+            ['Schedule', status?.entryThresholds?.isWeekend ? `Weekend (${status.entryThresholds.pacificDay})` : `Weekday (${status.entryThresholds.pacificDay ?? '--'})`],
+            ['Gate Status', status?.entryDebug?.blockers?.length ? status.entryDebug.blockers.join(', ') : 'Clear'],
+            ['Guardrails', (() => {
+              const g = status?.guardrails;
+              if (!g) return '--';
+              const items = [];
+              if (g.lossCooldownActive) items.push(`Loss CD ${Math.ceil(g.lossCooldownRemainingMs / 1000)}s`);
+              if (g.winCooldownActive) items.push(`Win CD ${Math.ceil(g.winCooldownRemainingMs / 1000)}s`);
+              if (g.circuitBreakerTripped) items.push('Circuit Breaker');
+              if (g.hasOpenPosition) items.push('Open Position');
+              return items.length ? items.join(', ') : 'Clear';
+            })()],
+            ['Kill Switch', status?.killSwitch?.active ? `Active (PnL $${Number(status.killSwitch.todayPnl).toFixed(2)} / -$${Number(status.killSwitch.limit).toFixed(0)})` : 'Inactive'],
+            ['Rec', status?.runtime?.recAction ? `${status.runtime.recAction} ${status.runtime.recSide ?? ''} (${status.runtime.recPhase ?? ''})` : 'None'],
+            ['Spread UP/DN', status?.runtime?.spreadUp != null ? `${Number(status.runtime.spreadUp).toFixed(1)}¢ / ${Number(status.runtime.spreadDown).toFixed(1)}¢` : '--'],
+          ].map(([label, value]) => (
+            <div key={label} className="flex justify-between border-b border-slate-800 py-1">
+              <span className="text-slate-400">{label}</span>
+              <span className={
+                value === 'Active' || value === 'Open' || value === 'Clear'
+                  ? 'text-emerald-400'
+                  : value === 'Blocked' || value === 'Inactive' || value.startsWith('Active (')
+                    ? 'text-amber-400'
+                    : 'text-slate-200'
+              }>{value}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="rounded-lg border border-slate-700 bg-slate-900">
         <div className="flex gap-2 border-b border-slate-700 p-3">
           <button
