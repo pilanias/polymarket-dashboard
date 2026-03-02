@@ -628,7 +628,10 @@ export async function startApp({ skipServer = false } = {}) {
     const signal = rec.action === "ENTER" ? `${rec.side} (${rec.phase})` : "NO TRADE";
     appendCsvRow("./logs/signals.csv", csvHeader, [new Date().toISOString(), timing.elapsedMinutes.toFixed(3), signal, timeAware.adjustedUp, timeAware.adjustedDown, marketUp, marketDown, edge.edgeUp, edge.edgeDown, rec.action === "ENTER" ? `${rec.side}:${rec.phase}` : "NO_TRADE"]);
 
-    renderConsole({ indicatorsData, timeAware, marketUp, marketDown, klines1m, polySnapshot, currentPrice, prevCurrentPrice, timeLeftMin });
+    // TUI disabled in unified dashboard mode
+    if (!skipServer) {
+      renderConsole({ indicatorsData, timeAware, marketUp, marketDown, klines1m, polySnapshot, currentPrice, prevCurrentPrice, timeLeftMin });
+    }
 
     prevCurrentPrice = currentPrice;
 
