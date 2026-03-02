@@ -29,7 +29,17 @@ export async function initialize() {
   const result = await startApp({ skipServer: true });
   _engine = result?.engine ?? null;
   _modeManager = result?.modeManager ?? null;
-  console.log("[BTC] Initialized — trading loop running in background");
+
+  // Belt-and-suspenders auto-start: ensure trading is enabled after boot.
+  // The engine constructor sets tradingEnabled=false, and startApp() should flip it,
+  // but DO restarts sometimes cause race conditions. This guarantees it.
+  const autoStart = (process.env.AUTO_START_TRADING || 'true').toLowerCase() === 'true';
+  if (autoStart && _engine && !_engine.tradingEnabled) {
+    _engine.tradingEnabled = true;
+    console.log("[BTC] Boot auto-start: forced tradingEnabled=true");
+  }
+
+  console.log("[BTC] Initialized — trading loop running in background, tradingEnabled:", _engine?.tradingEnabled);
   return { engine: _engine, modeManager: _modeManager };
 }
 
