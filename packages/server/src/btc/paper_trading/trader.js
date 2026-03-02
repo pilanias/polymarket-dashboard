@@ -108,7 +108,9 @@ export class Trader {
   }
 
   async processSignals(signals, klines1m) {
-    console.log(`Paper trader: rec=${signals.rec?.action || 'NONE'}, side=${signals.rec?.side || '-'}, timeLeft=${signals.timeLeftMin?.toFixed(1) || '-'}m`);
+    if (signals.rec?.action && signals.rec.action !== 'NO_TRADE') {
+      console.log(`Paper trader: rec=${signals.rec.action}, side=${signals.rec.side || '-'}, timeLeft=${signals.timeLeftMin?.toFixed(1) || '-'}m`);
+    }
     if (!CONFIG.paperTrading.enabled) return;
     if (!this.tradingEnabled) return;
 

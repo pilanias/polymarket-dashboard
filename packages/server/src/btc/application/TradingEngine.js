@@ -108,9 +108,9 @@ export class TradingEngine {
   async processSignals(signals, klines1m) {
     const mode = this.executor.getMode();
     const rec = signals?.rec;
-    console.log(
-      `${mode} engine: rec=${rec?.action || 'NONE'}, side=${rec?.side || '-'}, timeLeft=${signals?.timeLeftMin?.toFixed(1) || '-'}m`,
-    );
+    if (rec?.action && rec.action !== 'NO_TRADE') {
+      console.log(`${mode} engine: rec=${rec.action}, side=${rec.side || '-'}, timeLeft=${signals?.timeLeftMin?.toFixed(1) || '-'}m`);
+    }
 
     // Reset daily PnL counter at midnight
     this.state.resetDayIfNeeded();

@@ -142,7 +142,7 @@ async function fetchMarkBestEffort(client, tokenID) {
     // No orderbook for this token (404) → expired/non-tradable. Cache it.
     if (e?.status === 404 || String(e?.message).includes('404')) {
       _expiredTokenIds.add(String(tokenID));
-      console.debug(`Cached expired token (no orderbook): ${String(tokenID).slice(0, 12)}…`);
+      // Silenced — too noisy in production logs
       return { mark: null, tradable: false };
     }
     // For other errors, continue to fallback

@@ -100,7 +100,10 @@ export class LiveTrader {
   }
 
   async processSignals(signals) {
-    console.log(`Live trader: rec=${signals?.rec?.action || 'NONE'}, side=${signals?.rec?.side || '-'}, timeLeft=${signals?.timeLeftMin?.toFixed(1) || '-'}m`);
+    // Only log when there's an actionable signal (not NO_TRADE spam)
+    if (signals?.rec?.action && signals.rec.action !== 'NO_TRADE') {
+      console.log(`Live trader: rec=${signals.rec.action}, side=${signals.rec.side || '-'}, timeLeft=${signals.timeLeftMin?.toFixed(1) || '-'}m`);
+    }
 
     this._resetIfNeeded();
 
