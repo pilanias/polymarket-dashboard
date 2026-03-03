@@ -91,16 +91,18 @@ export const CONFIG = {
     // Raised from 0.52/0.53/0.55 based on 84-trade analysis:
     // entries at >60¢ (higher conviction) had 63% WR vs 27% at <40¢.
     // Loosened for high-frequency: bet on almost every market
-    minProbEarly: Number(process.env.MIN_PROB_EARLY) || 0.52,
-    minProbMid: Number(process.env.MIN_PROB_MID) || 0.53,
-    minProbLate: Number(process.env.MIN_PROB_LATE) || 0.55,
+    // Tightened: 75% of entries never went green. Need higher conviction.
+    minProbEarly: Number(process.env.MIN_PROB_EARLY) || 0.58,
+    minProbMid: Number(process.env.MIN_PROB_MID) || 0.60,
+    minProbLate: Number(process.env.MIN_PROB_LATE) || 0.62,
 
     // Lowered from 0.02 to 0.015: 84% of trades are EARLY phase with PF near 1.0.
     // Slightly looser edge lets more volume through where timing advantage is highest.
     // Minimal edge requirements — let volume flow
-    edgeEarly: Number(process.env.EDGE_EARLY) || 0.005,
-    edgeMid: Number(process.env.EDGE_MID) || 0.01,
-    edgeLate: Number(process.env.EDGE_LATE) || 0.02,
+    // Tightened: need real edge, not noise
+    edgeEarly: Number(process.env.EDGE_EARLY) || 0.02,
+    edgeMid: Number(process.env.EDGE_MID) || 0.03,
+    edgeLate: Number(process.env.EDGE_LATE) || 0.04,
 
     // Extra strictness knobs (used to improve odds without killing trade count)
     // MID entries tend to be weaker; require a bit more strength.
@@ -339,9 +341,11 @@ export const CONFIG = {
     // Avoid dust prices where spread/tick noise dominates.
     // Raised from 0.35 to 0.40: entries below 40¢ had 29% WR and -$107 PnL across 38 trades (234-trade analysis).
     // Widened for high-frequency: allow more price ranges
-    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.10,
+    // Tightened: prices below 35¢ are low-conviction noise
+    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.35,
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
-    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.90,
+    // Tightened: above 70¢ the upside is capped and risk is high
+    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.70,
     minOppositePolyPrice: Number(process.env.MIN_OPPOSITE_POLY_PRICE) || 0.05,
 
     // Chop/volatility filter (BTC reference): block entries when recent movement is too small.
@@ -354,7 +358,8 @@ export const CONFIG = {
     // Confidence filter: avoid coin-flip markets where the model is near 50/50.
     // We require max(modelUp, modelDown) >= this value to allow entries.
     // Lowered: allow near-50/50 markets
-    minModelMaxProb: Number(process.env.MIN_MODEL_MAX_PROB) || 0.50,
+    // Tightened: require model to have at least 55% confidence in one direction
+    minModelMaxProb: Number(process.env.MIN_MODEL_MAX_PROB) || 0.55,
 
     // RSI consolidation filter: disabled for high-frequency trading
     noTradeRsiMin: Number(process.env.NO_TRADE_RSI_MIN) || 0,
