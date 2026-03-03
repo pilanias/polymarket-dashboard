@@ -120,6 +120,19 @@ export class PaperExecutor extends OrderExecutor {
       return { filled: false, tradeId: null, fillPrice: 0, fillShares: 0, fillSizeUsd: 0 };
     }
 
+    // ── Realistic simulation adjustments ──────────────────────
+    // 1. Fee simulation: ~2% maker fee on Polymarket (applied as worse fill price)
+    const simFeeRate = CONFIG.paperTrading.simFeeRateBps ?? 200; // 200 bps = 2%
+    const feeMultiplier = 1 + (simFeeRate / 10000);
+    fillPrice = fillPrice * feeMultiplier; // Pay slightly more per share
+    fillShares = sizeUsd / fillPrice; // Fewer shares for same dollar amount
+
+    // 2. Slippage simulation: random additional 0.1-0.5% adverse price movement
+    const simSlippagePct = CONFIG.paperTrading.simSlippagePct ?? 0.003; // 0.3% avg
+    const slippage = 1 + (Math.random() * simSlippagePct);
+    fillPrice = fillPrice * slippage;
+    fillShares = sizeUsd / fillPrice;
+
     const tradeId = Date.now().toString() + Math.random().toString(36).substring(2, 8);
     const fillSizeUsd = fillShares * fillPrice;
 
@@ -201,6 +214,17 @@ export class PaperExecutor extends OrderExecutor {
     if (!isNum(exitPrice)) {
       exitPrice = trade.entryPrice;
     }
+
+    // ── Realistic exit simulation ──────────────────────────────
+    // Fee on exit: same rate as entry
+    const simFeeRate = CONFIG.paperTrading.simFeeRateBps ?? 200;
+    const exitFeeMultiplier = 1 - (simFeeRate / 10000); // Receive less per share
+    exitPrice = exitPrice * exitFeeMultiplier;
+
+    // Exit slippage: 0-0.3% adverse movement
+    const simSlippagePct = CONFIG.paperTrading.simSlippagePct ?? 0.003;
+    const exitSlippage = 1 - (Math.random() * simSlippagePct);
+    exitPrice = exitPrice * exitSlippage;
 
     // Compute PnL
     const tradeShares = isNum(trade.shares) ? trade.shares : (trade.entryPrice > 0 ? trade.contractSize / trade.entryPrice : 0);

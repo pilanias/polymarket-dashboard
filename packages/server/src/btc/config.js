@@ -242,6 +242,12 @@ export const CONFIG = {
 
     // When a probability flip happens, optionally close and immediately open the other side.
     // Default OFF (analytics showed flips were a major drag on PnL). Set FLIP_ON_PROB_FLIP=true to re-enable.
+    // Realistic paper trading simulation (approximate live market conditions)
+    // Fee simulation: 200 bps = 2% (Polymarket maker fee)
+    simFeeRateBps: Number(process.env.SIM_FEE_RATE_BPS) || 200,
+    // Slippage: random 0-0.3% adverse price movement on entry/exit
+    simSlippagePct: Number(process.env.SIM_SLIPPAGE_PCT) || 0.003,
+
     flipOnProbabilityFlip:
       (process.env.FLIP_ON_PROB_FLIP || 'false').toLowerCase() === 'true',
     flipCooldownSeconds: Number(process.env.FLIP_COOLDOWN_SECONDS) || 60,
