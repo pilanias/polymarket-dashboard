@@ -370,7 +370,6 @@ export class Trader {
         : false;
 
     // If we just hit a Max Loss stop in this market slug, skip entries until the slug changes.
-    const skipAfterMaxLoss =
     const inSkipMarket = Boolean(
       this.skipMarketUntilNextSlug &&
       marketSlug &&
