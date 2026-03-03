@@ -162,8 +162,10 @@ export const CONFIG = {
     // Quick stop: if trade drops X% of position within first N seconds, exit immediately.
     // 101-trade analysis showed 75% of max-loss trades never went green — bad entries.
     // At $120 position: 4% = $4.80 threshold. At $6 ($50 balance): $0.24 threshold.
+    // Disabled: at small balances ($50), 4% of $6 position = $0.24 — too tight.
+    // Polymarket price noise exceeds this on every tick.
     quickStopEnabled:
-      (process.env.QUICK_STOP_ENABLED || 'true').toLowerCase() === 'true',
+      (process.env.QUICK_STOP_ENABLED || 'false').toLowerCase() === 'true',
     quickStopSeconds: Number(process.env.QUICK_STOP_SECONDS) || 5,
     quickStopPct: Number(process.env.QUICK_STOP_PCT) || 0.04,
 
