@@ -322,9 +322,9 @@ export const CONFIG = {
     // Avoid dust prices where spread/tick noise dominates.
     // Raised from 0.35 to 0.40: entries below 40¢ had 29% WR and -$107 PnL across 38 trades (234-trade analysis).
     // Widened for high-frequency: allow more price ranges
-    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.20,
+    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.10,
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
-    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.80,
+    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.90,
     minOppositePolyPrice: Number(process.env.MIN_OPPOSITE_POLY_PRICE) || 0.05,
 
     // Chop/volatility filter (BTC reference): block entries when recent movement is too small.
@@ -337,7 +337,7 @@ export const CONFIG = {
     // Confidence filter: avoid coin-flip markets where the model is near 50/50.
     // We require max(modelUp, modelDown) >= this value to allow entries.
     // Lowered: allow near-50/50 markets
-    minModelMaxProb: Number(process.env.MIN_MODEL_MAX_PROB) || 0.51,
+    minModelMaxProb: Number(process.env.MIN_MODEL_MAX_PROB) || 0.50,
 
     // RSI consolidation filter: disabled for high-frequency trading
     noTradeRsiMin: Number(process.env.NO_TRADE_RSI_MIN) || 0,
@@ -353,9 +353,9 @@ export const CONFIG = {
     // Disabled for high-frequency — let both sides trade freely
     rsiDirectionalBiasEnabled:
       (process.env.RSI_DIRECTIONAL_BIAS_ENABLED || 'false').toLowerCase() === 'true',
-    rsiBearishThreshold: Number(process.env.RSI_BEARISH_THRESHOLD) || 40,
+    rsiBearishThreshold: Number(process.env.RSI_BEARISH_THRESHOLD) || 30,
     // Raised from 60 to 65: RSI>60 UP had 42 trades at -$7 PnL. Cuts marginal entries.
-    rsiBullishThreshold: Number(process.env.RSI_BULLISH_THRESHOLD) || 65,
+    rsiBullishThreshold: Number(process.env.RSI_BULLISH_THRESHOLD) || 70,
 
     // Heiken Ashi exhaustion filter: block entries when HA count is 4-6.
     // 157-trade data: count 4-6 had 38% WR, -$35. Count 2-3 best (54% WR, +$112).
@@ -379,7 +379,7 @@ export const CONFIG = {
     // Time filters
     // For 5m, avoid new entries too close to settlement (rollover risk)
     // Allow entries closer to settlement
-    noEntryFinalMinutes: Number(process.env.NO_ENTRY_FINAL_MIN) || 1.0,
+    noEntryFinalMinutes: Number(process.env.NO_ENTRY_FINAL_MIN) || 0.5,
 
     // Require enough 1m candles before allowing entries (helps avoid 50/50 startup)
     minCandlesForEntry: Number(process.env.MIN_CANDLES_FOR_ENTRY) || 12,
