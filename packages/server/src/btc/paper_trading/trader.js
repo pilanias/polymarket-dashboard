@@ -1080,6 +1080,13 @@ export class Trader {
       }
 
       if (shouldExit) {
+        // If this is a Max Loss exit, set skip-market BEFORE closing
+        // to guarantee it's set before the next tick can evaluate entry.
+        if (String(exitReason || '').startsWith('Max Loss') && marketSlug) {
+          this.skipMarketUntilNextSlug = marketSlug;
+          console.log(`[BTC] Skip market set (pre-close): ${marketSlug} (after ${exitReason})`);
+        }
+
         const exitPrice = effectivePriceForSide(trade.side);
         if (exitPrice !== null) {
           await this.closeTrade(trade, exitPrice, exitReason);
@@ -1183,6 +1190,11 @@ export class Trader {
         }
         // If we exceeded max loss, label it as such regardless of the triggering exit.
         reason = `Max Loss ($${Math.abs(maxLossUsd).toFixed(2)})`;
+        // Also set skip-market here in case it wasn't set before closeTrade was called
+        if (trade?.marketSlug) {
+          this.skipMarketUntilNextSlug = trade.marketSlug;
+          console.log(`[BTC] Skip market set (pnl-cap): ${trade.marketSlug}`);
+        }
       }
     }
 
@@ -1193,10 +1205,10 @@ export class Trader {
     }
 
     // After a Max Loss exit, skip re-entry for the remainder of this market slug.
-    // This avoids getting chopped multiple times in the same 5m window.
+    // Belt-and-suspenders: also set here in case pre-close didn't catch it.
     if (String(reason || '').startsWith('Max Loss') && trade?.marketSlug) {
       this.skipMarketUntilNextSlug = trade.marketSlug;
-      console.log(`[BTC] Skip market set: ${trade.marketSlug} (after ${reason})`);
+      console.log(`[BTC] Skip market set (closeTrade): ${trade.marketSlug} (after ${reason})`);
     }
 
     trade.exitPrice = exitPrice;
