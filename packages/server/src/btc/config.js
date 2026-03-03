@@ -165,7 +165,7 @@ export const CONFIG = {
 
     // Daily loss limit: kill-switch threshold (applies to BOTH paper and live modes)
     // Alias: DAILY_LOSS_LIMIT overrides LIVE_MAX_DAILY_LOSS_USD for unified behavior
-    maxDailyLossUsd: Number(process.env.DAILY_LOSS_LIMIT || process.env.MAX_DAILY_LOSS_USD) || 50,
+    maxDailyLossUsd: Number(process.env.DAILY_LOSS_LIMIT || process.env.MAX_DAILY_LOSS_USD) || 0,
 
     // Kill-switch for paper mode: disabled by default for testing flexibility.
     // Set PAPER_KILL_SWITCH_ENABLED=true to re-enable.
