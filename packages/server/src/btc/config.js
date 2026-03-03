@@ -381,8 +381,9 @@ export const CONFIG = {
     // This prevents accidental live trading in development.
     envGate: process.env.LIVE_ENV_GATE || null, // Set to "production" to gate
 
-    // Conservative defaults; scale up later as bankroll grows.
-    maxPerTradeUsd: Number(process.env.LIVE_MAX_PER_TRADE_USD) || 7,
+    // Start small, scale up as strategy proves out in live.
+    // Week 1: $3, Week 2: $10, Week 3: $25, Week 4+: full size
+    maxPerTradeUsd: Number(process.env.LIVE_MAX_PER_TRADE_USD) || 3,
     maxOpenExposureUsd: Number(process.env.LIVE_MAX_OPEN_EXPOSURE_USD) || 10,
     // Kill switch: if realized PnL for the day <= -maxDailyLossUsd, stop live trading.
     // Reset mode: "midnight_pt" (default)
@@ -408,11 +409,11 @@ export const CONFIG = {
     allowMarketOrders:
       (process.env.LIVE_ALLOW_MARKET_ORDERS || 'false').toLowerCase() ===
       'true',
-    // Safety default: post-only until full position lifecycle (fills + exits) is implemented.
+    // Post-only = maker orders only = cheaper fees on Polymarket.
     postOnly: (process.env.LIVE_POST_ONLY || 'true').toLowerCase() === 'true',
 
     // Take-profit on high-priced outcome token regardless of time left.
-    // Example: 0.90 means if mark >= 0.90 (90¢), exit.
+    // Set to null — let trailing TP system handle exits instead of a fixed price ceiling.
     takeProfitPrice:
       process.env.LIVE_TAKE_PROFIT_PRICE != null &&
       String(process.env.LIVE_TAKE_PROFIT_PRICE).trim() !== ''
