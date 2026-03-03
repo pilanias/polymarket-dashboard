@@ -369,13 +369,18 @@ export class Trader {
         ? Date.now() - this.lastWinAtMs < winCooldownSec * 1000
         : false;
 
-    // If we just hit a Max Loss stop in this market slug, skip entries until the slug changes.
+    // One trade per market: skip entries until the slug changes.
     const inSkipMarket = Boolean(
       this.skipMarketUntilNextSlug &&
       marketSlug &&
+      marketSlug !== 'unknown' &&
       this.skipMarketUntilNextSlug === marketSlug,
     );
-    if (this.skipMarketUntilNextSlug && marketSlug && this.skipMarketUntilNextSlug !== marketSlug) {
+    // Debug: log skip state when it's set
+    if (this.skipMarketUntilNextSlug && !this.openTrade) {
+      console.log(`[BTC] Skip check: skip=${this.skipMarketUntilNextSlug}, current=${marketSlug}, match=${inSkipMarket}`);
+    }
+    if (this.skipMarketUntilNextSlug && marketSlug && marketSlug !== 'unknown' && this.skipMarketUntilNextSlug !== marketSlug) {
       console.log(`[BTC] Skip market cleared: was ${this.skipMarketUntilNextSlug}, now ${marketSlug}`);
       this.skipMarketUntilNextSlug = null;
     }
@@ -1091,7 +1096,8 @@ export class Trader {
           await this.closeTrade(trade, exitPrice, exitReason);
 
           // Optional flip: immediately open the other side
-          if (shouldFlip) {
+          // Blocked when one-trade-per-market is active (skipMarketUntilNextSlug is set)
+          if (shouldFlip && !this.skipMarketUntilNextSlug) {
             const newSide = trade.side === 'UP' ? 'DOWN' : 'UP';
             const entryPrice = effectivePriceForSide(newSide);
 
