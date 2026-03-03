@@ -45,12 +45,16 @@ export async function runResolver(dbApi = db) {
       event?.markets?.find((m) => String(m.question || "").trim() === String(row.question).trim()) ??
       event?.markets?.[0];
     if (!market) continue;
-    if (!(market.closed || event.closed)) continue;
 
     const outcomes = parseJsonArray(market.outcomes);
     const prices = parseJsonArray(market.outcomePrices);
     const final = parseResolved(outcomes, prices);
     if (!final) continue;
+
+    // For neg-risk grouped events, individual market.closed can be false
+    // even when resolved. Trust the outcome prices (>= 0.95) as resolution signal.
+    const isClosed = market.closed || event.closed || final.confidence >= 0.95;
+    if (!isClosed) continue;
 
     const win = (final.val === 1 && row.side === "YES") || (final.val === 0 && row.side === "NO");
     const pnl =
