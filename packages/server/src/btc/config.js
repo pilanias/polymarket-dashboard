@@ -130,7 +130,7 @@ export const CONFIG = {
 
     // Hard max loss cap (USD): prevents one trade from wiping multiple small wins.
     // If pnlNow <= -maxLossUsdPerTrade, force exit (unless max-loss grace is enabled).
-    maxLossUsdPerTrade: Number(process.env.MAX_LOSS_USD_PER_TRADE) || 20,
+    maxLossUsdPerTrade: Number(process.env.MAX_LOSS_USD_PER_TRADE) || 25,
 
     // Dynamic stop loss: scale maxLoss proportionally to position size.
     // When enabled, maxLoss = contractSize * dynamicStopLossPct, clamped to [minMaxLossUsd, maxMaxLossUsd].
@@ -141,9 +141,9 @@ export const CONFIG = {
     // Tightened from 0.12 to 0.10: avg max loss was $9.82 across 63 trades. Shaves ~$1-2 per loss.
     // Widened from 10% to 15%: stop-outs were killing correct-direction trades.
     // At $137 contracts, 15% = ~$20 max loss. Gives trades room to breathe.
-    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.15,
-    minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 10,
-    maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 25,
+    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.18,
+    minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 15,
+    maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 30,
 
     // Max-loss grace (optional): when pnl breaches -maxLossUsdPerTrade, allow a short grace window
     // to recover (helps avoid wick/chop stop-outs) *only when conditions are supportive*.
