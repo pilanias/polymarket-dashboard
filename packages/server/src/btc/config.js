@@ -117,7 +117,7 @@ export const CONFIG = {
 
     // Stagnation exit: if trade is flat (PnL within ±$2) after this many seconds, exit early.
     // v1.0.7 data: trades >25s had 36% WR, +$0.55 avg. Stagnating trades usually hit max loss.
-    stagnationExitSeconds: Number(process.env.STAGNATION_EXIT_SECONDS) || 30,
+    stagnationExitSeconds: Number(process.env.STAGNATION_EXIT_SECONDS) || 0, // 0 = disabled
     stagnationBandUsd: Number(process.env.STAGNATION_BAND_USD) || 2,
 
     // Time stop: if a trade can't go green quickly, cut it.
