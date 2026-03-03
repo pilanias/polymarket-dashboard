@@ -152,6 +152,13 @@ export class TradingEngine {
         const mae = this.state.getMinUnrealized(posId);
         if (mfe !== null) p.maxUnrealizedPnl = mfe;
         if (mae !== null) p.minUnrealizedPnl = mae;
+
+        // Sync to executor.openTrade so the status API sees live MFE/MAE
+        const execTrade = this.executor?.openTrade;
+        if (execTrade) {
+          if (mfe !== null) execTrade.maxUnrealizedPnl = mfe;
+          if (mae !== null) execTrade.minUnrealizedPnl = mae;
+        }
       }
     }
 

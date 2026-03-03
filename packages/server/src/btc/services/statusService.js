@@ -19,9 +19,13 @@ export async function assembleStatus() {
   const engine = globalThis.__tradingEngine ?? null;
   const modeManager = globalThis.__modeManager ?? null;
 
-  // Prefer engine's live executor open trade (has real-time MFE/MAE),
-  // fall back to paper trader, then ledger.
-  const openTrade = engine?.executor?.openTrade ?? getOpenTrade();
+  // Get open trade with live MFE/MAE. Try multiple sources:
+  // 1. Paper trader's live in-memory trade (MFE/MAE updated every tick)
+  // 2. Engine executor's copy
+  // 3. Ledger fallback (stale, no MFE/MAE)
+  const traderTrade = getOpenTrade();
+  const executorTrade = engine?.executor?.openTrade;
+  const openTrade = traderTrade ?? executorTrade;
 
   // Entry debug from unified engine
   const entryDebug = engine?.lastEntryStatus ?? null;
