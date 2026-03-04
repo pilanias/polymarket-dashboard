@@ -232,8 +232,10 @@ export const CONFIG = {
     // Trailing take profit (recommended):
     // - Once maxUnrealizedPnl >= trailingStartUsd, we track a trail = maxUnrealizedPnl - trailingDrawdownUsd.
     // - If pnlNow falls back below the trail, we exit (locking in gains).
+    // Disabled: fixed TP handles exits now. Trailing TP was undercutting
+    // by exiting at small pullbacks before fixed TP could trigger.
     trailingTakeProfitEnabled:
-      (process.env.TRAILING_TAKE_PROFIT_ENABLED || 'true').toLowerCase() ===
+      (process.env.TRAILING_TAKE_PROFIT_ENABLED || 'false').toLowerCase() ===
       'true',
     // Dynamic trailing TP: scales with position size (% of contractSize).
     // At $1000 balance, 12% stake = $120 position:
