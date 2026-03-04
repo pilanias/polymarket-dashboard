@@ -153,11 +153,10 @@ export const CONFIG = {
       (process.env.FIXED_TP_ENABLED || 'true').toLowerCase() === 'true',
     // Raised from 5% to 10%: $5 TP vs $8 SL needed 62% WR (too hard).
     // $10 TP vs $8 SL needs only 44% WR. Data shows trades regularly hit $10+ MFE.
-    fixedTakeProfitPct: Number(process.env.FIXED_TP_PCT) || 0.12, // 12% of position ($12 at $100)
-    // After 2 minutes, reduce TP to 4% ($4) — capture smaller wins that would reverse
-    // Data: 5/6 losses that went green peaked at $3-5 but never hit $12
-    reducedTakeProfitPct: Number(process.env.REDUCED_TP_PCT) || 0.04,
-    reducedTpAfterSeconds: Number(process.env.REDUCED_TP_AFTER_SEC) || 120,
+    fixedTakeProfitPct: Number(process.env.FIXED_TP_PCT) || 0.05, // 5% of position ($5 at $100)
+    // Time-based TP reduction disabled
+    reducedTakeProfitPct: Number(process.env.REDUCED_TP_PCT) || 0.05,
+    reducedTpAfterSeconds: Number(process.env.REDUCED_TP_AFTER_SEC) || 9999,
 
     // Tightened from 12% to 8%: simulation showed $76 saved over 20 max-loss trades
     dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.08,
