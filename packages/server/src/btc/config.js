@@ -79,8 +79,10 @@ export const CONFIG = {
     startingBalance: Number(process.env.STARTING_BALANCE) || 50,
     // Raised from 8% to 12%: at $1,139 balance this means ~$137/trade instead of ~$91.
     // As balance grows, trades scale automatically. Floor $50, ceiling $300.
-    stakePct: Number(process.env.STAKE_PCT) || 0.12, // 12% of balance per trade
-    minTradeUsd: Number(process.env.MIN_TRADE_USD) || 50,
+    // Raised from 12% to 35%: at $50 balance, 12% = $6 positions — too small
+    // for Polymarket spread/noise. 35% = $17.50 per trade, viable.
+    stakePct: Number(process.env.STAKE_PCT) || 0.35, // 35% of balance per trade
+    minTradeUsd: Number(process.env.MIN_TRADE_USD) || 5,
     maxTradeUsd: Number(process.env.MAX_TRADE_USD) || 300,
 
     // Back-compat (legacy fixed size). If stakePct is set, we use dynamic sizing.
