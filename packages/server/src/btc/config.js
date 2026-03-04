@@ -153,7 +153,7 @@ export const CONFIG = {
       (process.env.FIXED_TP_ENABLED || 'true').toLowerCase() === 'true',
     // Raised from 5% to 10%: $5 TP vs $8 SL needed 62% WR (too hard).
     // $10 TP vs $8 SL needs only 44% WR. Data shows trades regularly hit $10+ MFE.
-    fixedTakeProfitPct: Number(process.env.FIXED_TP_PCT) || 0.10, // 10% of position
+    fixedTakeProfitPct: Number(process.env.FIXED_TP_PCT) || 0.12, // 12% of position ($12 at $100)
 
     // Tightened from 12% to 8%: simulation showed $76 saved over 20 max-loss trades
     dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.08,
