@@ -24,7 +24,9 @@ import { getBalance as getLiveBalance, isLiveMode, placeBuyOrder } from "./excha
 import {
   detectMarketType,
   fmtDateInTz,
+  FORECAST_SIGMA,
   isTemperatureQuestion,
+  MIN_BUCKET_PROB,
   normalCdf,
   parseDateFromQuestion,
   parseInequalityC,
@@ -46,7 +48,54 @@ function kellySize(modelProb, entryPrice, side) {
   const payoff = 1 / entryPrice - 1;
   const kelly = (p * payoff - (1 - p)) / payoff;
   const halfKelly = kelly / 2;
-  return Math.max(0.01, Math.min(0.08, halfKelly));
+  return Math.max(0.01, Math.min(0.04, halfKelly));
+}
+
+/**
+ * Compute model probabilities for ALL buckets in a neg-risk grouped event,
+ * then normalize so they sum to 1. This gives proper multinomial probabilities
+ * instead of evaluating each bucket independently with a continuous CDF.
+ *
+ * Returns a Map of question → modelProb (normalized).
+ */
+function computeEventBucketProbs(markets, forecastTemp, sigma) {
+  const bucketProbs = [];
+
+  for (const market of markets) {
+    if (!market.question || !market.active) continue;
+    const question = market.question;
+    const range = parseRangeC(question);
+    const ineq = parseInequalityC(question);
+    const thr = parseThresholdC(question);
+
+    let rawProb = 0;
+    if (range) {
+      const z1 = (range.lowC - forecastTemp) / sigma;
+      const z2 = (range.highC - forecastTemp) / sigma;
+      rawProb = Math.max(0, normalCdf(z2) - normalCdf(z1));
+    } else if (ineq) {
+      const z = (ineq.valueC - forecastTemp) / sigma;
+      rawProb = ineq.op === "le" ? normalCdf(z) : 1 - normalCdf(z);
+    } else if (thr) {
+      const z1 = ((thr.valueC - 0.5) - forecastTemp) / sigma;
+      const z2 = ((thr.valueC + 0.5) - forecastTemp) / sigma;
+      rawProb = Math.max(0, normalCdf(z2) - normalCdf(z1));
+    } else {
+      continue;
+    }
+    bucketProbs.push({ question, rawProb });
+  }
+
+  // Normalize so all buckets sum to 1
+  const total = bucketProbs.reduce((s, b) => s + b.rawProb, 0);
+  const result = new Map();
+  if (total > 0) {
+    for (const b of bucketProbs) {
+      const normalized = Math.max(MIN_BUCKET_PROB, b.rawProb / total);
+      result.set(b.question, normalized);
+    }
+  }
+  return result;
 }
 
 export async function runTradeDiscovery(dbApi = db) {
@@ -100,60 +149,42 @@ export async function runTradeDiscovery(dbApi = db) {
       if (event.closed || !Array.isArray(event.markets)) continue;
       const eventDate = event.endDate ? event.endDate.slice(0, 10) : null;
 
-      for (const market of event.markets) {
-        if (market.closed || !market.active) continue;
+      if (event.endDate) {
+        const hrs = (new Date(event.endDate).getTime() - Date.now()) / 36e5;
+        if (Number.isFinite(hrs) && hrs >= 0 && hrs < MIN_HOURS_TO_CLOSE) continue;
+      }
+
+      // Filter to temperature markets for this city
+      const tempMarkets = event.markets.filter((m) => {
+        if (m.closed || !m.active) return false;
+        const q = (m.question || "").toLowerCase();
+        const aliasMatch = city.aliases.some((a) => q.includes(a.toLowerCase()));
+        if (!aliasMatch) return false;
+        const type = detectMarketType(m.question);
+        return type === "temp_max" || type === "temp_min";
+      });
+      if (!tempMarkets.length) continue;
+
+      // Determine type and forecast temp for this event
+      const type = detectMarketType(tempMarkets[0].question);
+      const forecastTemp = type === "temp_max" ? dayUse.tmax : dayUse.tmin;
+      if (forecastTemp == null) continue;
+
+      const dateStr = parseDateFromQuestion(tempMarkets[0].question, city.tz) || eventDate;
+      if (dateStr && dateStr < localDate) continue;
+
+      const blendedNote = type === "temp_max"
+        ? `Forecast tmax=${dayUse.tmax}C σ=${FORECAST_SIGMA} (Blended ${blendedTemps?.modelsUsed ?? 0} models)`
+        : `Forecast tmin=${dayUse.tmin}C σ=${FORECAST_SIGMA} (Blended ${blendedTemps?.modelsUsed ?? 0} models)`;
+
+      // Compute normalized bucket probabilities across ALL markets in this event
+      const bucketProbs = computeEventBucketProbs(tempMarkets, forecastTemp, FORECAST_SIGMA);
+
+      for (const market of tempMarkets) {
         const question = market.question || "";
-        const qLower = question.toLowerCase();
-        const aliasMatch = city.aliases.some((a) => qLower.includes(a.toLowerCase()));
-        if (!aliasMatch) continue;
-
-        const dateStr = parseDateFromQuestion(question, city.tz) || eventDate;
-        if (dateStr && dateStr < localDate) continue;
-
-        const type = detectMarketType(question);
-        if (!type || !isTemperatureQuestion(question)) continue;
-        if (type !== "temp_max" && type !== "temp_min") continue;
-
-        let modelProb = null;
-        let notes = "";
-        if (type === "temp_max") {
-          const range = parseRangeC(question);
-          const ineq = parseInequalityC(question);
-          if (range) {
-            const sigma = 1.5;
-            const z1 = (range.lowC - dayUse.tmax) / sigma;
-            const z2 = (range.highC - dayUse.tmax) / sigma;
-            modelProb = Math.max(0, Math.min(1, normalCdf(z2) - normalCdf(z1)));
-          } else if (ineq) {
-            const sigma = 1.5;
-            const z = (ineq.valueC - dayUse.tmax) / sigma;
-            modelProb = ineq.op === "le" ? normalCdf(z) : 1 - normalCdf(z);
-          } else {
-            const thr = parseThresholdC(question);
-            if (!thr) continue;
-            modelProb = probTempEquals(dayUse.tmax, thr.valueC);
-          }
-          notes = `Forecast tmax=${dayUse.tmax}C (Blended ${blendedTemps?.modelsUsed ?? 0} models)`;
-        } else {
-          const range = parseRangeC(question);
-          const ineq = parseInequalityC(question);
-          if (range) {
-            const sigma = 1.5;
-            const z1 = (range.lowC - dayUse.tmin) / sigma;
-            const z2 = (range.highC - dayUse.tmin) / sigma;
-            modelProb = Math.max(0, Math.min(1, normalCdf(z2) - normalCdf(z1)));
-          } else if (ineq) {
-            const sigma = 1.5;
-            const z = (ineq.valueC - dayUse.tmin) / sigma;
-            modelProb = ineq.op === "le" ? normalCdf(z) : 1 - normalCdf(z);
-          } else {
-            const thr = parseThresholdC(question);
-            if (!thr) continue;
-            modelProb = probTempEquals(dayUse.tmin, thr.valueC);
-          }
-          notes = `Forecast tmin=${dayUse.tmin}C (Blended ${blendedTemps?.modelsUsed ?? 0} models)`;
-        }
+        let modelProb = bucketProbs.get(question);
         if (modelProb == null) continue;
+
         modelProb = applyCalibration(city.name, type, modelProb);
 
         const outcomes = parseJsonArray(market.outcomes);
@@ -166,21 +197,12 @@ export async function runTradeDiscovery(dbApi = db) {
         let yesPrice = Number.parseFloat(outcomePrices[yesIdx]);
         let noPrice = Number.parseFloat(outcomePrices[noIdx]);
         if (tokenIds[yesIdx]) {
-          try {
-            yesPrice = await clobPrice(tokenIds[yesIdx]);
-          } catch {}
+          try { yesPrice = await clobPrice(tokenIds[yesIdx]); } catch {}
         }
         if (tokenIds[noIdx]) {
-          try {
-            noPrice = await clobPrice(tokenIds[noIdx]);
-          } catch {}
+          try { noPrice = await clobPrice(tokenIds[noIdx]); } catch {}
         }
         if (!Number.isFinite(yesPrice) || !Number.isFinite(noPrice)) continue;
-
-        if (event.endDate) {
-          const hrs = (new Date(event.endDate).getTime() - Date.now()) / 36e5;
-          if (Number.isFinite(hrs) && hrs >= 0 && hrs < MIN_HOURS_TO_CLOSE) continue;
-        }
 
         const edgeYes = modelProb - yesPrice;
         const edgeNo = 1 - modelProb - noPrice;
@@ -220,7 +242,7 @@ export async function runTradeDiscovery(dbApi = db) {
           stake_usd: stakeUsd,
           status: "OPEN",
           result: "PENDING",
-          notes,
+          notes: blendedNote,
           token_id: tokenId ?? null,
           condition_id: market.conditionId ?? null,
           neg_risk: market.negRisk ? 1 : 0,

@@ -70,17 +70,17 @@ function dayTempsFromHourly(hourly, dateStr) {
   return { tmax: Math.max(...temps), tmin: Math.min(...temps) };
 }
 
-export async function forecastHourlyBlended(lat, lon, tz, models) {
-  const dateStr = getLocalDateString(tz);
+export async function forecastHourlyBlended(lat, lon, tz, models, targetDate = null) {
+  const dateStr = targetDate || getLocalDateString(tz);
   const selectedModels = Array.isArray(models) ? models : [];
 
   const modelCalls = selectedModels.map(async (model) => {
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&hourly=temperature_2m&timezone=${encodeURIComponent(tz)}&models=${encodeURIComponent(model)}`;
+      `&hourly=temperature_2m&timezone=${encodeURIComponent(tz)}&models=${encodeURIComponent(model)}&forecast_days=3`;
     const data = await fetchJson(url);
     const day = dayTempsFromHourly(data?.hourly, dateStr);
-    if (!day) throw new Error(`No hourly temperatures for ${model}`);
+    if (!day) throw new Error(`No hourly temperatures for ${model} on ${dateStr}`);
     return day;
   });
 

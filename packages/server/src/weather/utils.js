@@ -39,10 +39,14 @@ export function normalCdf(x) {
   return p;
 }
 
-export function probTempEquals(forecast, threshold, sigma = 1.5) {
+export const FORECAST_SIGMA = 3.0;
+export const MIN_BUCKET_PROB = 0.05;
+
+export function probTempEquals(forecast, threshold, sigma = FORECAST_SIGMA) {
   const z1 = ((threshold - 0.5) - forecast) / sigma;
   const z2 = ((threshold + 0.5) - forecast) / sigma;
-  return Math.max(0, Math.min(1, normalCdf(z2) - normalCdf(z1)));
+  const raw = Math.max(0, Math.min(1, normalCdf(z2) - normalCdf(z1)));
+  return Math.max(MIN_BUCKET_PROB, raw);
 }
 
 export function sigmoid(x) {

@@ -115,7 +115,7 @@ export const MODEL_CANDIDATES = {
 };
 
 export const BASE_BANKROLL = 100;
-export const MIN_EDGE = 0.03;
+export const MIN_EDGE = 0.08;
 export const MIN_PRICE = 0.15;
 export const MAX_PRICE = 0.85;
 export const MIN_ABS_MODEL_DIFF = 0.08;
