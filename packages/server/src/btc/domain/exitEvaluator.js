@@ -289,11 +289,18 @@ export function evaluateExits(position, signals, config, graceState, nowMs) {
   // trail trigger and actual fill. Fixed TP exits at the target, period.
   const fixedTpEnabled = config.fixedTakeProfitEnabled ?? false;
   const fixedTpPct = config.fixedTakeProfitPct ?? 0.05; // 5% of position
+  const reducedTpPct = config.reducedTakeProfitPct ?? 0.04; // 4% after time threshold
+  const reducedTpAfterSeconds = config.reducedTpAfterSeconds ?? 120; // 2 minutes
   if (fixedTpEnabled && pnlNow !== null && isNum(position.contractSize) && position.contractSize > 0) {
-    const tpTarget = position.contractSize * fixedTpPct;
+    // After N seconds in the trade, lower the TP target to capture smaller wins
+    // that would otherwise reverse into max losses.
+    const useReduced = isNum(tradeAgeSec) && tradeAgeSec >= reducedTpAfterSeconds;
+    const activePct = useReduced ? reducedTpPct : fixedTpPct;
+    const tpTarget = position.contractSize * activePct;
     if (pnlNow >= tpTarget) {
+      const label = useReduced ? 'Reduced TP' : 'Take Profit';
       result.decision = {
-        reason: `Take Profit ($${pnlNow.toFixed(2)} >= $${tpTarget.toFixed(2)} [${(fixedTpPct*100).toFixed(0)}%])`,
+        reason: `${label} ($${pnlNow.toFixed(2)} >= $${tpTarget.toFixed(2)} [${(activePct*100).toFixed(0)}%])`,
       };
       return result;
     }
