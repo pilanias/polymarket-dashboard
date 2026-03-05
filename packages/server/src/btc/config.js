@@ -358,8 +358,9 @@ export const CONFIG = {
     // Avoid dust prices where spread/tick noise dominates.
     // Raised from 0.35 to 0.40: entries below 40¢ had 29% WR and -$107 PnL across 38 trades (234-trade analysis).
     // Widened for high-frequency: allow more price ranges
-    // Only enter when one side is at 85¢+ (market is confident about direction)
-    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.85,
+    // Only enter when one side shows clear direction (65¢+ = market leans that way)
+    // 85¢ was too restrictive — most markets don't reach it in final 1.5min
+    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.65,
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
     // Tightened: above 70¢ the upside is capped and risk is high
     maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.95,
