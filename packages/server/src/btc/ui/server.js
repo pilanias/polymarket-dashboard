@@ -17,6 +17,7 @@ import { TradingState } from '../application/TradingState.js';
 import { CONFIG } from '../config.js';
 import { getPacificTimeInfo } from '../domain/entryGate.js';
 import { generateSuggestions } from '../services/suggestionService.js';
+import { archiveTrades, getConfigVersions, getArchivedTrades } from '../infrastructure/persistence/tradeArchive.js';
 
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
@@ -601,6 +602,54 @@ router.get('/config/current', (req, res) => {
   } catch (error) {
     console.error('Error fetching current config:', error.message);
     res.status(500).json(fail('Failed to fetch current config.'));
+  }
+});
+
+// ─── Archive endpoints ────────────────────────────────────────────
+
+/**
+ * POST /archive — Archive current trades with a config version label.
+ * Body: { version: "v1.0.7", notes: "92 trades, momentum model" }
+ */
+router.post('/archive', async (req, res) => {
+  try {
+    const { version, notes } = req.body || {};
+    if (!version) return res.status(400).json(fail('version is required'));
+
+    const engine = globalThis.__tradingEngine;
+    const config = engine?.config || {};
+
+    const result = await archiveTrades(version, config, notes || '');
+    res.json(ok(result));
+  } catch (error) {
+    console.error('Error archiving trades:', error.message);
+    res.status(500).json(fail(`Archive failed: ${error.message}`));
+  }
+});
+
+/**
+ * GET /archive/versions — List all config versions with stats.
+ */
+router.get('/archive/versions', async (req, res) => {
+  try {
+    const versions = await getConfigVersions();
+    res.json(ok(versions));
+  } catch (error) {
+    console.error('Error listing config versions:', error.message);
+    res.status(500).json(fail(error.message));
+  }
+});
+
+/**
+ * GET /archive/trades/:version — Get archived trades for a config version.
+ */
+router.get('/archive/trades/:version', async (req, res) => {
+  try {
+    const trades = await getArchivedTrades(req.params.version);
+    res.json(ok(trades));
+  } catch (error) {
+    console.error('Error fetching archived trades:', error.message);
+    res.status(500).json(fail(error.message));
   }
 });
 
