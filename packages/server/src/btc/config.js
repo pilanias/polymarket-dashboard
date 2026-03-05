@@ -383,8 +383,8 @@ export const CONFIG = {
     noTradeRsiMax: Number(process.env.NO_TRADE_RSI_MAX) || 0,
 
     // RSI overbought/oversold directional filter
-    noTradeRsiOverbought: Number(process.env.NO_TRADE_RSI_OVERBOUGHT) || 78,
-    noTradeRsiOversold: Number(process.env.NO_TRADE_RSI_OVERSOLD) || 22,
+    noTradeRsiOverbought: Number(process.env.NO_TRADE_RSI_OVERBOUGHT) || 100,
+    noTradeRsiOversold: Number(process.env.NO_TRADE_RSI_OVERSOLD) || 0,
 
     // RSI directional bias: align trade direction with momentum.
     // RSI < 40 → only DOWN allowed. RSI > 60 → only UP allowed.
