@@ -91,7 +91,7 @@ function getSettlementTrend(n = 5) {
  * @param {number} params.timeLeftMin  - Minutes remaining in current market
  * @returns {{ rawUp: number, signals: Object, confidence: string }}
  */
-export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin }) {
+export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin, orderbookImbalance, orderbookWall }) {
   const signals = {};
   let upWeight = 0;
   let downWeight = 0;
@@ -185,7 +185,60 @@ export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin }) {
     // 50/50 zone (both 40-60¢) — no signal, skip
   }
 
-  // ── 5. Settlement Trend (last 5 markets) — weight 1 ──────────
+  // ── 5. Tick Acceleration — weight 2 ─────────────────────────────
+  // Is the Polymarket price move accelerating or decelerating?
+  // Acceleration = velocity is increasing → more trustworthy signal
+  const ACCEL_WEIGHT = 2;
+
+  const polyDelta60Up = getPolyDelta('UP', 60);
+  const polyDelta15Up = getPolyDelta('UP', 15);
+  signals.polyDelta60sUp = polyDelta60Up;
+  signals.polyDelta15sUp = polyDelta15Up;
+
+  if (polyDelta60Up !== null && polyDelta15Up !== null) {
+    // 60s velocity and 15s velocity
+    // If 15s velocity > half of 60s velocity, the move is accelerating
+    const velocity60 = polyDelta60Up;
+    const velocity15 = polyDelta15Up;
+    const acceleration = velocity15 - (velocity60 - velocity15); // positive = speeding up
+
+    signals.polyAcceleration = acceleration;
+
+    // Only fire if there's meaningful movement AND it's accelerating
+    if (Math.abs(velocity60) > 0.005 && Math.abs(acceleration) > 0.002) {
+      if (acceleration > 0) {
+        upWeight += ACCEL_WEIGHT;
+      } else {
+        downWeight += ACCEL_WEIGHT;
+      }
+      totalWeight += ACCEL_WEIGHT;
+    }
+  }
+
+  // ── 6. Order Book Imbalance — weight 3 ────────────────────────
+  // Heavy bid volume = smart money expects UP. Strongest forward-looking signal.
+  const OB_WEIGHT = 3;
+
+  if (typeof orderbookImbalance === 'number' && Number.isFinite(orderbookImbalance)) {
+    signals.orderbookImbalance = orderbookImbalance;
+    signals.orderbookWall = orderbookWall ?? null;
+
+    // Threshold: |imbalance| > 0.20 is meaningful
+    if (Math.abs(orderbookImbalance) > 0.20) {
+      if (orderbookImbalance > 0) {
+        upWeight += OB_WEIGHT;
+      } else {
+        downWeight += OB_WEIGHT;
+      }
+      totalWeight += OB_WEIGHT;
+
+      // Bonus weight for wall detection (large single order)
+      if (orderbookWall === 'BID') { upWeight += 1; totalWeight += 1; }
+      if (orderbookWall === 'ASK') { downWeight += 1; totalWeight += 1; }
+    }
+  }
+
+  // ── 7. Settlement Trend (last 5 markets) — weight 1 ──────────
   // Lightest weight: trend persistence. If last 3+ settled UP, lean UP.
   const TREND_WEIGHT = 1;
 

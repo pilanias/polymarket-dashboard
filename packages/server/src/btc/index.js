@@ -34,6 +34,7 @@ import { computeHeikenAshi, countConsecutive } from "./indicators/heikenAshi.js"
 import { detectRegime } from "./engines/regime.js";
 import { scoreDirection, applyTimeAwareness } from "./engines/probability.js";
 import { scoreMomentum, applyTimeAwarenessMomentum, recordPolyPrice } from "./engines/momentum.js";
+import { fetchOrderbookImbalance } from "./engines/orderbookImbalance.js";
 import { computeEdge, decide } from "./engines/edge.js";
 
 // Utilities and Setup
@@ -533,21 +534,36 @@ export async function startApp({ skipServer = false } = {}) {
     // Record poly prices for momentum model's history buffer
     recordPolyPrice(polyPrices.UP, polyPrices.DOWN);
 
-    // ── Momentum model (new) ─────────────────────────────────────
+    // ── Orderbook imbalance (forward-looking signal) ───────────────
+    let obImbalance = null, obWall = null;
+    try {
+      const market = polySnapshot.ok ? polySnapshot.market : null;
+      if (market) {
+        const { pickTokenId } = await import('./infrastructure/market/tokenMapping.js');
+        const upTokenId = pickTokenId(market, 'Up') || pickTokenId(market, 'UP');
+        if (upTokenId) {
+          const ob = await fetchOrderbookImbalance(upTokenId);
+          if (ob) { obImbalance = ob.imbalance; obWall = ob.wallSide; }
+        }
+      }
+    } catch (_) { /* optional signal — silent fail */ }
+
+    // ── Momentum model (primary) ─────────────────────────────────
     const momentum = scoreMomentum({
       spotTicks,
       polyUp: polyPrices.UP,
       polyDown: polyPrices.DOWN,
       timeLeftMin,
+      orderbookImbalance: obImbalance,
+      orderbookWall: obWall,
     });
     const momentumTimeAware = applyTimeAwarenessMomentum(
       momentum.rawUp, timeLeftMin, CONFIG.candleWindowMinutes
     );
 
-    // v1.0.7 restore: use original lagging indicator model
-    // Momentum model kept for logging/comparison only
-    const activeModelUp = timeAware.adjustedUp;
-    const activeModelDown = timeAware.adjustedDown;
+    // Use momentum model as the active model (old lagging model logged for comparison)
+    const activeModelUp = momentumTimeAware.adjustedUp;
+    const activeModelDown = momentumTimeAware.adjustedDown;
 
     const edge = computeEdge({ modelUp: activeModelUp, modelDown: activeModelDown, marketYes: marketUp, marketNo: marketDown });
     const rec = decide({ remainingMinutes: timeLeftMin, edgeUp: edge.edgeUp, edgeDown: edge.edgeDown, modelUp: activeModelUp, modelDown: activeModelDown });
