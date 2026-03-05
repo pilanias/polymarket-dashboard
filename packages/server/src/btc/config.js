@@ -149,19 +149,21 @@ export const CONFIG = {
     // At $6 position ($50 balance): 12% = $0.72
     // Fixed take-profit: exit immediately at X% of position. No trailing, no slippage.
     // At $100 position: 5% = $5 profit target. Fires before trailing TP.
+    // Fixed TP at $5 — guaranteed exit when green. Trailing can override if higher.
     fixedTakeProfitEnabled:
-      (process.env.FIXED_TP_ENABLED || 'false').toLowerCase() === 'true',
+      (process.env.FIXED_TP_ENABLED || 'true').toLowerCase() === 'true',
     // Raised from 5% to 10%: $5 TP vs $8 SL needed 62% WR (too hard).
     // $10 TP vs $8 SL needs only 44% WR. Data shows trades regularly hit $10+ MFE.
-    fixedTakeProfitPct: Number(process.env.FIXED_TP_PCT) || 0.05, // 5% of position ($5 at $100)
+    fixedTakeProfitPct: Number(process.env.FIXED_TP_PCT) || 0.06, // 6% of position (~$5 at $80)
     // Time-based TP reduction disabled
     reducedTakeProfitPct: Number(process.env.REDUCED_TP_PCT) || 0.05,
     reducedTpAfterSeconds: Number(process.env.REDUCED_TP_AFTER_SEC) || 9999,
 
     // Tightened from 12% to 8%: simulation showed $76 saved over 20 max-loss trades
-    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.10,
-    minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 8,
-    maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 20,
+    // Tightened: risk $5 instead of $8. At 30% MFE $5+ rate, breakeven ~50% WR
+    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.06,
+    minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 5,
+    maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 12,
 
     // Max-loss grace (optional): when pnl breaches -maxLossUsdPerTrade, allow a short grace window
     // to recover (helps avoid wick/chop stop-outs) *only when conditions are supportive*.
@@ -251,7 +253,8 @@ export const CONFIG = {
 
     // Trailing start threshold as % of position size
     // Lowered from 4% to 3%: activate trailing sooner to lock in gains earlier
-    trailingStartPct: Number(process.env.TRAILING_START_PCT) || 0.03,  // 3%
+    // Raised: don't trail until $5+ profit. 30% of trades hit this level.
+    trailingStartPct: Number(process.env.TRAILING_START_PCT) || 0.06,  // 6%
 
     // Base trailing drawdown as % of position size
     // Widened from 1.2% to 1.7%: was cutting winners too early (46% MFE capture)
