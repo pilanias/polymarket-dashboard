@@ -113,9 +113,27 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
     blockers.push(`Rec=${rec?.action || 'NONE'} (loose)`);
   }
 
-  // ── 2. Side resolution (inference in loose mode) ─────────────────
+  // ── 2. Side resolution ─────────────────────────────────────────
   let effectiveSide = rec?.side ?? null;
   let sideInferred = false;
+
+  // Market-price override: if one side is at minPolyPrice (e.g., 85¢+),
+  // pick that side regardless of what the model says. The market knows best.
+  const polyUpPrice = signals.polyPricesCents?.UP ?? (signals.polyMarketSnapshot?.prices?.up ?? null);
+  const polyDownPrice = signals.polyPricesCents?.DOWN ?? (signals.polyMarketSnapshot?.prices?.down ?? null);
+  const minPoly = config.minPolyPrice ?? 0.35;
+  if (minPoly >= 0.70 && isNum(polyUpPrice) && isNum(polyDownPrice)) {
+    // High minPolyPrice = market-confidence strategy. Pick the high side.
+    const upVal = polyUpPrice > 1 ? polyUpPrice / 100 : polyUpPrice; // handle cents vs decimal
+    const downVal = polyDownPrice > 1 ? polyDownPrice / 100 : polyDownPrice;
+    if (upVal >= minPoly && upVal > downVal) {
+      effectiveSide = 'UP';
+      sideInferred = true;
+    } else if (downVal >= minPoly && downVal > upVal) {
+      effectiveSide = 'DOWN';
+      sideInferred = true;
+    }
+  }
 
   if (!effectiveSide && !strictRec) {
     const upP = isNum(signals.modelUp) ? signals.modelUp : null;
@@ -194,6 +212,12 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
   const noEntryFinal = config.noEntryFinalMinutes ?? 1.5;
   if (isNum(timeLeftForEntry) && timeLeftForEntry < noEntryFinal) {
     blockers.push(`Too late (<${noEntryFinal}m to settlement)`);
+  }
+
+  // ── 4b. Only enter in final X minutes (late-entry strategy) ────
+  const onlyEntryFinalMinutes = config.onlyEntryFinalMinutes ?? 0;
+  if (onlyEntryFinalMinutes > 0 && isNum(timeLeftForEntry) && timeLeftForEntry > onlyEntryFinalMinutes) {
+    blockers.push(`Too early (>${onlyEntryFinalMinutes}m left, waiting for final window)`);
   }
 
   // ── 5. Candle warmup ───────────────────────────────────────────
@@ -389,7 +413,6 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
   }
 
   // ── 20. Polymarket price bounds ────────────────────────────────
-  const minPoly = config.minPolyPrice ?? 0.002;
   const maxPoly = config.maxPolyPrice ?? 0.98;
 
   if (!isNum(currentPolyPrice) || currentPolyPrice < minPoly || currentPolyPrice > maxPoly) {

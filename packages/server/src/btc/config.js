@@ -358,8 +358,8 @@ export const CONFIG = {
     // Avoid dust prices where spread/tick noise dominates.
     // Raised from 0.35 to 0.40: entries below 40¢ had 29% WR and -$107 PnL across 38 trades (234-trade analysis).
     // Widened for high-frequency: allow more price ranges
-    // Tightened: prices below 35¢ are low-conviction noise
-    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.05,
+    // Only enter when one side is at 85¢+ (market is confident about direction)
+    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.85,
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
     // Tightened: above 70¢ the upside is capped and risk is high
     maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.95,
@@ -419,6 +419,9 @@ export const CONFIG = {
     // For 5m, avoid new entries too close to settlement (rollover risk)
     // Allow entries closer to settlement
     noEntryFinalMinutes: Number(process.env.NO_ENTRY_FINAL_MIN) || 0,
+    // Only enter in the final X minutes of the market. 0 = disabled.
+    // Late-entry strategy: wait for market to show clear direction.
+    onlyEntryFinalMinutes: Number(process.env.ONLY_ENTRY_FINAL_MIN) || 1.5,
 
     // Require enough 1m candles before allowing entries (helps avoid 50/50 startup)
     minCandlesForEntry: Number(process.env.MIN_CANDLES_FOR_ENTRY) || 1,
