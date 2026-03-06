@@ -1,5 +1,22 @@
 # Weather Bot Changelog
 
+## 2026-03-06 — v3: YES-First Strategy
+
+### Problem with v2
+- 15 trades: 7W/8L, -$12.81, 47% WR
+- 20%+ edge bucket: 60% WR, -7% ROI (close to breakeven)
+- 10-20% edge bucket: 20% WR, -50% ROI (disaster)
+- Still mostly betting NO on off-center buckets — bad payoff asymmetry
+
+### Fix: Flip to YES-First
+- **Core change:** Find the bucket that CONTAINS the forecast temperature, buy YES if underpriced
+- Payoff comparison: YES at $0.15 → $1.00 = 567% return vs NO at $0.60 → $1.00 = 67%
+- Forecast bucket detection uses ±1.5°C containment, not highest model probability
+- NO bets only for extreme mispricings (>25% edge on far-from-forecast buckets)
+- MIN_EDGE: 8% → 15% (kills the bad 10-20% edge trades)
+- Tick interval: 30min → 10min (catch opportunities faster)
+- Data wiped for clean start
+
 ## 2026-03-04 — Model Rebuild (v2.0)
 
 ### Problem
