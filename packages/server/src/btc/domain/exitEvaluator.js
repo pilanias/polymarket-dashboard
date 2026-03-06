@@ -387,6 +387,30 @@ export function evaluateExits(position, signals, config, graceState, nowMs) {
 
   // ── 6b. Stagnation exit — trade going nowhere after threshold ───
   // Trades >30s with flat PnL are more likely to eventually hit max loss than recover.
+  // ── 5b. Tiered Take Profit — data-driven profit protection ─────
+  // Simulation over 113 trades: turned -$1 into +$390.
+  // Logic: lower the TP threshold as time passes.
+  //   - After 120s: take $10+
+  //   - After 180s: take $5+
+  //   - After 250s: take any green (protect gains before settlement)
+  //   - Otherwise: ride to settlement
+  const tieredTpEnabled = config.tieredTakeProfitEnabled ?? true;
+  if (tieredTpEnabled && pnlNow !== null && isNum(tradeAgeSec)) {
+    const tiers = config.tieredTakeProfitTiers ?? [
+      { minAgeSec: 120, minPnlUsd: 10 },
+      { minAgeSec: 180, minPnlUsd: 5 },
+      { minAgeSec: 250, minPnlUsd: 0.01 },
+    ];
+    for (const tier of tiers) {
+      if (tradeAgeSec >= tier.minAgeSec && pnlNow >= tier.minPnlUsd) {
+        result.decision = {
+          reason: `Tiered TP ($${pnlNow.toFixed(2)} after ${tradeAgeSec.toFixed(0)}s, tier $${tier.minPnlUsd}@${tier.minAgeSec}s)`
+        };
+        return result;
+      }
+    }
+  }
+
   // v1.0.7 data: trades >25s had 36% WR and +$0.55 avg PnL.
   const stagnationSeconds = config.stagnationExitSeconds ?? 0;
   const stagnationBandUsd = config.stagnationBandUsd ?? 2;
