@@ -18,7 +18,7 @@ let tickInFlight = null;
 let tickTimer = null;
 let tradingEnabled = true;
 
-const tickIntervalMs = 30 * 60 * 1000;
+const tickIntervalMs = 10 * 60 * 1000;
 
 async function runTickCycle() {
   if (tickInFlight) return tickInFlight;

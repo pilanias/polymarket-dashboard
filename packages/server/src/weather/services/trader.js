@@ -180,6 +180,41 @@ export async function runTradeDiscovery(dbApi = db) {
       // Compute normalized bucket probabilities across ALL markets in this event
       const bucketProbs = computeEventBucketProbs(tempMarkets, forecastTemp, FORECAST_SIGMA);
 
+      // Strategy: find the bucket that CONTAINS the forecast temperature and buy YES
+      // if the market underprices it. This gives better payoff asymmetry:
+      // buying YES at $0.15 that resolves to $1.00 = 567% return
+      // vs buying NO at $0.60 that resolves to $1.00 = 67% return
+      //
+      // Also consider adjacent buckets (±1 range from forecast).
+      // Only take NO bets on extreme mispricings (>25% edge).
+
+      // Find which bucket actually contains the forecast temperature
+      const forecastBuckets = new Set();
+      for (const market of tempMarkets) {
+        const q = market.question || "";
+        const range = parseRangeC(q);
+        const ineq = parseInequalityC(q);
+        const thr = parseThresholdC(q);
+        let contains = false;
+        if (range) {
+          // Range: check if forecast falls within lowC..highC (with 1°C buffer for adjacent)
+          contains = forecastTemp >= (range.lowC - 1.5) && forecastTemp <= (range.highC + 1.5);
+        } else if (ineq) {
+          // Inequality: forecast bucket if forecast is near the boundary
+          const dist = Math.abs(forecastTemp - ineq.valueC);
+          contains = dist <= 2.0;
+        } else if (thr) {
+          // Exact temp: forecast bucket if within ±1.5°C
+          contains = Math.abs(forecastTemp - thr.valueC) <= 1.5;
+        }
+        if (contains) forecastBuckets.add(q);
+      }
+      // If no bucket matched (shouldn't happen), fall back to top 3 by model prob
+      if (forecastBuckets.size === 0) {
+        const sorted = [...bucketProbs.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+        for (const [q] of sorted) forecastBuckets.add(q);
+      }
+
       for (const market of tempMarkets) {
         const question = market.question || "";
         let modelProb = bucketProbs.get(question);
@@ -206,15 +241,32 @@ export async function runTradeDiscovery(dbApi = db) {
 
         const edgeYes = modelProb - yesPrice;
         const edgeNo = 1 - modelProb - noPrice;
-        const side = edgeYes > edgeNo ? "YES" : "NO";
-        const price = side === "YES" ? yesPrice : noPrice;
-        const edge = side === "YES" ? edgeYes : edgeNo;
-        const tokenId = side === "YES" ? tokenIds[yesIdx] : tokenIds[noIdx];
-        const marketProbYes = yesPrice;
 
+        // Determine side based on strategy:
+        // - For forecast-aligned buckets (top 3): strongly prefer YES
+        // - For other buckets: only take NO if edge is very large (>25%)
+        let side, price, edge, tokenId;
+        const isForecastBucket = forecastBuckets.has(question);
+
+        if (isForecastBucket && edgeYes >= MIN_EDGE) {
+          // Buy YES on forecast-aligned bucket — the core strategy
+          side = "YES";
+          price = yesPrice;
+          edge = edgeYes;
+          tokenId = tokenIds[yesIdx];
+        } else if (!isForecastBucket && edgeNo >= 0.25) {
+          // Sell (buy NO) on far-from-forecast buckets only with huge edge
+          side = "NO";
+          price = noPrice;
+          edge = edgeNo;
+          tokenId = tokenIds[noIdx];
+        } else {
+          continue; // Skip — no clear edge
+        }
+
+        const marketProbYes = yesPrice;
         if (marketProbYes < MIN_PRICE || marketProbYes > MAX_PRICE) continue;
         if (Math.abs(modelProb - marketProbYes) < MIN_ABS_MODEL_DIFF) continue;
-        if (edge < MIN_EDGE) continue;
 
         const sizePct = kellySize(modelProb, price, side);
         let stakeUsd = bankroll * sizePct;
@@ -242,7 +294,7 @@ export async function runTradeDiscovery(dbApi = db) {
           stake_usd: stakeUsd,
           status: "OPEN",
           result: "PENDING",
-          notes: blendedNote,
+          notes: `${blendedNote} | ${isForecastBucket ? "FORECAST_BUCKET" : "FAR_BUCKET"}`,
           token_id: tokenId ?? null,
           condition_id: market.conditionId ?? null,
           neg_risk: market.negRisk ? 1 : 0,
