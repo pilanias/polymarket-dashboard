@@ -335,8 +335,7 @@ export const CONFIG = {
       Number(process.env.NO_ENTRY_AFTER_FRIDAY_HOUR) || 17,
 
     // Weekend tightening: allow weekend trading, but require stronger signals/market quality.
-    weekendTighteningEnabled:
-      (process.env.WEEKEND_TIGHTENING || 'true').toLowerCase() === 'true',
+    weekendTighteningEnabled: false,
     weekendMaxSpread: Number(process.env.WEEKEND_MAX_SPREAD) || 0.008, // 0.8¢
     weekendMinLiquidity: Number(process.env.WEEKEND_MIN_LIQUIDITY) || 20000,
     weekendMinRangePct20:
