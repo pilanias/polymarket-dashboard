@@ -558,6 +558,7 @@ export async function startApp({ skipServer = false } = {}) {
       timeLeftMin,
       orderbookImbalance: obImbalance,
       orderbookWall: obWall,
+      llmPrediction: globalThis.__llmPrediction ?? null,
     });
     const momentumTimeAware = applyTimeAwarenessMomentum(
       momentum.rawUp, timeLeftMin, CONFIG.candleWindowMinutes
@@ -609,6 +610,7 @@ export async function startApp({ skipServer = false } = {}) {
         recentTrades: engine.executor?.recentTrades?.slice?.(-5) ?? [],
         spotDelta1m: spotDelta1mPct,
         spotDelta5s: momentum.signals?.spotDelta5s ?? null,
+        candles1m: klines1m,
       }).then(pred => {
         if (pred) {
           globalThis.__llmPrediction = pred;

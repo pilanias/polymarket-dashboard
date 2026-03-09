@@ -91,7 +91,7 @@ function getSettlementTrend(n = 5) {
  * @param {number} params.timeLeftMin  - Minutes remaining in current market
  * @returns {{ rawUp: number, signals: Object, confidence: string }}
  */
-export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin, orderbookImbalance, orderbookWall }) {
+export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin, orderbookImbalance, orderbookWall, llmPrediction }) {
   const signals = {};
   let upWeight = 0;
   let downWeight = 0;
@@ -280,6 +280,24 @@ export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin, orderb
       downWeight += TREND_WEIGHT; // strong DOWN trend
       totalWeight += TREND_WEIGHT;
     }
+  }
+
+  // ── 8. LLM Signal (weight 4 — heaviest, sees bigger picture) ────
+  const LLM_WEIGHT = 4;
+  signals.llmDirection = llmPrediction?.direction ?? null;
+  signals.llmConfidence = llmPrediction?.confidence ?? null;
+
+  if (llmPrediction && llmPrediction.direction && llmPrediction.confidence > 0.5) {
+    // Scale weight by LLM confidence: 55% → 2 weight, 80% → 4 weight
+    const scaledWeight = Math.round(LLM_WEIGHT * (llmPrediction.confidence - 0.5) * 2);
+    const effectiveWeight = Math.max(1, Math.min(LLM_WEIGHT, scaledWeight));
+    
+    if (llmPrediction.direction === 'UP') {
+      upWeight += effectiveWeight;
+    } else {
+      downWeight += effectiveWeight;
+    }
+    totalWeight += effectiveWeight;
   }
 
   // ── Compute final probability ─────────────────────────────────
