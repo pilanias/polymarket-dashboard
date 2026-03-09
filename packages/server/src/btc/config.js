@@ -170,7 +170,7 @@ export const CONFIG = {
 
     // Tightened from 12% to 8%: simulation showed $76 saved over 20 max-loss trades
     // Tightened: risk $5 instead of $8. At 30% MFE $5+ rate, breakeven ~50% WR
-    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.20,
+    dynamicStopLossPct: 0.12, // 12% of position — hardcoded, no env override
     minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 3,
     maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 50,
 
@@ -296,7 +296,7 @@ export const CONFIG = {
     ],
 
     // Legacy/unused
-    takeProfitPct: Number(process.env.TAKE_PROFIT_PCT) || 0.08,
+    takeProfitPct: 0.18, // 18% of position — hardcoded, no env override
 
     // Dynamic exit: close when opposite side becomes more likely.
     // Example: if you're in UP and modelDown >= modelUp + exitFlipMargin AND modelDown >= exitFlipMinProb → exit.
@@ -375,7 +375,7 @@ export const CONFIG = {
     // Raised from 0.35 to 0.40: entries below 40¢ had 29% WR and -$107 PnL across 38 trades (234-trade analysis).
     // Widened for high-frequency: allow more price ranges
     // Only enter when one side is 70¢-90¢ (clear direction but not too expensive)
-    minPolyPrice: Number(process.env.MIN_POLY_PRICE) || 0.05,
+    minPolyPrice: 0.40, // skip low-conviction entries — hardcoded
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
     // Tightened: above 70¢ the upside is capped and risk is high
     maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.95,
