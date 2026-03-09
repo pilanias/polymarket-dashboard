@@ -171,8 +171,8 @@ export const CONFIG = {
     // Tightened from 12% to 8%: simulation showed $76 saved over 20 max-loss trades
     // Tightened: risk $5 instead of $8. At 30% MFE $5+ rate, breakeven ~50% WR
     dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.20,
-    minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 5,
-    maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 12,
+    minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 3,
+    maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 50,
 
     // Max-loss grace (optional): when pnl breaches -maxLossUsdPerTrade, allow a short grace window
     // to recover (helps avoid wick/chop stop-outs) *only when conditions are supportive*.
