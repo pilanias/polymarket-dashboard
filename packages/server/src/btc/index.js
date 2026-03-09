@@ -610,8 +610,13 @@ export async function startApp({ skipServer = false } = {}) {
       }).then(pred => {
         if (pred) {
           globalThis.__llmPrediction = pred;
+          console.log(`[LLM] Prediction cached: ${pred.direction} (${(pred.confidence * 100).toFixed(0)}%)`);
+        } else {
+          console.warn('[LLM] No prediction returned (null) — check API key');
         }
-      }).catch(() => {});
+      }).catch(err => {
+        console.error(`[LLM] Error: ${err.message}`);
+      });
     }
 
     const signalsForTrader = buildSignals({ rec, klines1m, polySnapshot, polyPrices, marketUp, marketDown, timeLeftMin, timeAware: activeTimeAware, indicatorsData, spotNow, spotDelta1mPct, candleMeta });
