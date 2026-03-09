@@ -79,7 +79,7 @@ function buildGateChecks(status) {
 
   // LLM
   const llm = rt.llmPrediction;
-  const llmLabel = llm ? `${llm.direction === 'UP' ? '🟢' : '🔴'} ${llm.direction} (${(llm.confidence * 100).toFixed(0)}%)` : 'No key set';
+  const llmLabel = llm ? `${llm.direction === 'UP' ? '🟢' : '🔴'} ${llm.direction} (${(llm.confidence * 100).toFixed(0)}%)` : 'Waiting for next market...';
 
   return [
     {
