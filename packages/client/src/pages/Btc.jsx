@@ -63,6 +63,24 @@ function buildGateChecks(status) {
   const pct = (v) => `${(Number(v || 0) * 100).toFixed(1)}%`;
   const cents = (v) => `${(Number(v || 0) * 100).toFixed(1)}¢`;
 
+  // Kelly position size calculation
+  const modelProb = Math.max(Number(rt.modelUp || 0), Number(rt.modelDown || 0));
+  const kellyAlpha = 0.25;
+  const kellyPct = modelProb > 0.5 ? kellyAlpha * (2 * modelProb - 1) : 0;
+  const clampedKelly = Math.max(0.02, Math.min(0.25, kellyPct));
+  const bal = status.balance?.balance ?? 1000;
+  const kellySize = Math.floor(bal * clampedKelly);
+
+  // Orderbook
+  const obImb = rt.momentumSignals?.orderbookImbalance;
+  const obLabel = obImb != null
+    ? (obImb > 0.1 ? `🟢 Buyers (${(obImb * 100).toFixed(0)}%)` : obImb < -0.1 ? `🔴 Sellers (${(obImb * 100).toFixed(0)}%)` : `⚪ Neutral (${(obImb * 100).toFixed(0)}%)`)
+    : '--';
+
+  // LLM
+  const llm = rt.llmPrediction;
+  const llmLabel = llm ? `${llm.direction === 'UP' ? '🟢' : '🔴'} ${llm.direction} (${(llm.confidence * 100).toFixed(0)}%)` : 'No key set';
+
   return [
     {
       check: 'Trading Enabled',
@@ -73,20 +91,32 @@ function buildGateChecks(status) {
     {
       check: 'Recommendation',
       current: rt.recAction ? `${rt.recAction} ${rt.recSide || ''} (${rt.recPhase || ''})` : 'None',
-      required: 'BUY signal',
-      pass: rt.recAction === 'BUY',
+      required: 'ENTER signal',
+      pass: rt.recAction === 'ENTER',
     },
     {
-      check: 'Model Probability',
+      check: 'Model Confidence',
       current: rt.modelUp != null ? `Up ${pct(rt.modelUp)} / Down ${pct(rt.modelDown)}` : '--',
       required: `≥ ${pct(et.minModelMaxProb)}`,
-      pass: !isBlocked('strong signal') && !isBlocked('prob') && !isBlocked('conviction'),
+      pass: !isBlocked('conviction') && !isBlocked('prob'),
     },
     {
-      check: 'RSI',
-      current: rt.rsiNow != null ? Number(rt.rsiNow).toFixed(1) : '--',
-      required: (et.noTradeRsiMin === 0 && et.noTradeRsiMax === 0) ? 'Disabled' : et.noTradeRsiMin != null ? `Outside [${et.noTradeRsiMin}, ${et.noTradeRsiMax}]` : '--',
-      pass: (et.noTradeRsiMin === 0 && et.noTradeRsiMax === 0) ? true : !isBlocked('rsi'),
+      check: 'Kelly Size',
+      current: `$${kellySize} (${(clampedKelly * 100).toFixed(1)}%)`,
+      required: '$25–$250',
+      pass: kellySize >= 25,
+    },
+    {
+      check: 'Orderbook',
+      current: obLabel,
+      required: '—',
+      pass: true,
+    },
+    {
+      check: 'LLM Signal',
+      current: llmLabel,
+      required: 'Shadow',
+      pass: true,
     },
     {
       check: 'Spread',
@@ -95,64 +125,28 @@ function buildGateChecks(status) {
       pass: !isBlocked('spread'),
     },
     {
-      check: 'Entry Price',
-      current: rt.polyUp != null ? `Up ${cents(rt.polyUp)} / Down ${cents(rt.polyDown)}` : '--',
-      required: `≤ ${cents(et.maxEntryPolyPrice)}`,
-      pass: !isBlocked('entry price'),
-    },
-    {
-      check: 'Opposite Price',
-      current: '--',
-      required: `≥ ${cents(et.minOppositePolyPrice)}`,
-      pass: !isBlocked('opposite price'),
-    },
-    {
       check: 'Liquidity',
-      current: rt.liquidityNum != null ? String(Number(rt.liquidityNum).toFixed(0)) : '--',
-      required: `≥ ${et.minLiquidity || '--'}`,
+      current: rt.liquidityNum != null ? `$${Number(rt.liquidityNum).toLocaleString()}` : '--',
+      required: `≥ $${et.minLiquidity || '--'}`,
       pass: !isBlocked('liquidity'),
-    },
-    {
-      check: 'Range (20-candle)',
-      current: rt.rangePct20 != null ? pct(rt.rangePct20) : '--',
-      required: `≥ ${pct(et.minRangePct20)}`,
-      pass: !isBlocked('choppy') && !isBlocked('range'),
-    },
-    {
-      check: 'BTC Impulse (1m)',
-      current: rt.spotDelta1mPct != null ? `${(Math.abs(Number(rt.spotDelta1mPct)) * 100).toFixed(3)}%` : '--',
-      required: `≥ ${pct(et.minBtcImpulsePct1m)}`,
-      pass: !isBlocked('impulse'),
-    },
-    {
-      check: 'Candles',
-      current: String(rt.candleCount ?? '--'),
-      required: `≥ ${et.minCandlesForEntry || '--'}`,
-      pass: !isBlocked('candle'),
     },
     {
       check: 'Time to Settlement',
       current: rt.timeLeftMin != null ? (() => { const m = Number(rt.timeLeftMin); const mins = Math.floor(m); const secs = Math.round((m - mins) * 60); return `${mins}m ${secs}s`; })() : '--',
-      required: `> ${et.noEntryFinalMinutes || 1.5}m`,
-      pass: !isBlocked('too late'),
-    },
-    {
-      check: 'Loss Cooldown',
-      current: g.lossCooldownActive ? `${Math.ceil((g.lossCooldownRemainingMs || 0) / 1000)}s remaining` : 'Clear',
-      required: 'Clear',
-      pass: !g.lossCooldownActive,
-    },
-    {
-      check: 'Win Cooldown',
-      current: g.winCooldownActive ? `${Math.ceil((g.winCooldownRemainingMs || 0) / 1000)}s remaining` : 'Clear',
-      required: 'Clear',
-      pass: !g.winCooldownActive,
+      required: '—',
+      pass: true,
     },
     {
       check: 'Circuit Breaker',
       current: g.circuitBreakerTripped ? `Tripped (${g.consecutiveLosses} losses)` : `Clear (${g.consecutiveLosses || 0} losses)`,
       required: 'Clear',
       pass: !g.circuitBreakerTripped,
+    },
+    {
+      check: 'Max Drawdown',
+      current: bal != null ? `$${Number(bal).toFixed(0)} / $${Number(status.balance?.starting ?? 1000).toFixed(0)}` : '--',
+      required: '≥ 85%',
+      pass: !isBlocked('drawdown'),
     },
     {
       check: 'Open Position',
@@ -424,8 +418,25 @@ export default function Btc() {
               </p>
             </div>
             <div>
-              <p className="text-slate-400">RSI</p>
-              <p className="text-slate-200">{status.runtime?.rsiNow != null ? Number(status.runtime.rsiNow).toFixed(1) : '--'}</p>
+              <p className="text-slate-400">Session</p>
+              <p className="text-slate-200">{(() => {
+                const h = new Date().getUTCHours();
+                if (h >= 0 && h < 8) return '🌏 Asia';
+                if (h >= 8 && h < 13) return '🇬🇧 London';
+                if (h >= 13 && h < 17) return '🇬🇧🇺🇸 LDN/NY';
+                if (h >= 17 && h < 22) return '🇺🇸 New York';
+                return '🌙 After Hours';
+              })()}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Orderbook</p>
+              <p className="text-slate-200">{(() => {
+                const ob = status.runtime?.momentumSignals?.orderbookImbalance;
+                if (ob == null) return '--';
+                if (ob > 0.1) return `🟢 Buyers (${(ob * 100).toFixed(0)}%)`;
+                if (ob < -0.1) return `🔴 Sellers (${(ob * 100).toFixed(0)}%)`;
+                return `⚪ Neutral (${(ob * 100).toFixed(0)}%)`;
+              })()}</p>
             </div>
             <div>
               <p className="text-slate-400">Candles (1m)</p>
