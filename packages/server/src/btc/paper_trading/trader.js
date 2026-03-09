@@ -89,35 +89,29 @@ export class Trader {
     const { balance } = this.getBalanceSnapshot();
     if (!Number.isFinite(balance) || balance <= 0) return 0;
 
-    const stakePct = CONFIG.paperTrading.stakePct;
-    const useDynamic =
-      typeof stakePct === 'number' && Number.isFinite(stakePct) && stakePct > 0;
+    const minUsd = CONFIG.paperTrading.minTradeUsd ?? 25;
+    const maxUsd = CONFIG.paperTrading.maxTradeUsd ?? 250;
 
-    const minUsd = CONFIG.paperTrading.minTradeUsd ?? 0;
-    const maxUsd = CONFIG.paperTrading.maxTradeUsd ?? Number.POSITIVE_INFINITY;
+    // Pure fractional Kelly sizing: f = α * (2p - 1)
+    // p = model probability, α = Kelly fraction (0.25 = quarter Kelly)
+    // Quarter Kelly at various confidence levels ($1000 balance):
+    //   55% → 2.5% → $25    |  60% → 5.0% → $50
+    //   65% → 7.5% → $75    |  70% → 10%  → $100
+    //   80% → 15%  → $150   |  90% → 20%  → $200
+    const alpha = CONFIG.paperTrading.kellyFraction ?? 0.25;
+    let kellyPct;
 
-    // Fractional Kelly sizing: scale position by model confidence
-    // Kelly fraction f = α * (p * b - q) / b where:
-    //   p = model probability, q = 1-p, b = odds (payout ratio ≈ 1 for Polymarket)
-    //   α = Kelly fraction (0.25 = quarter Kelly for safety)
-    const kellyEnabled = CONFIG.paperTrading.kellyEnabled ?? true;
-    let kellyMultiplier = 1.0;
-
-    if (kellyEnabled && typeof modelConfidence === 'number' && modelConfidence > 0.5) {
-      const alpha = CONFIG.paperTrading.kellyFraction ?? 0.25; // quarter Kelly
-      const p = modelConfidence;
-      const q = 1 - p;
-      const b = 1; // ~even money on Polymarket
-      const kellyF = alpha * ((p * b - q) / b);
-      // Clamp to [0.3, 2.0] of base stake — never less than 30%, never more than 2x
-      kellyMultiplier = Math.max(0.3, Math.min(2.0, kellyF / (stakePct || 0.08)));
-      // If Kelly says don't bet (negative), use minimum
-      if (kellyF <= 0) kellyMultiplier = 0.3;
+    if (typeof modelConfidence === 'number' && modelConfidence > 0.5) {
+      kellyPct = alpha * (2 * modelConfidence - 1);
+    } else {
+      // No confidence data — use minimum bet
+      kellyPct = alpha * 0.1; // ~2.5% floor
     }
 
-    let size = useDynamic
-      ? balance * stakePct * kellyMultiplier
-      : (CONFIG.paperTrading.contractSize ?? 100);
+    // Clamp Kelly % to [2%, 25%] of balance
+    kellyPct = Math.max(0.02, Math.min(0.25, kellyPct));
+
+    let size = balance * kellyPct;
     size = Math.max(minUsd, Math.min(maxUsd, size));
     size = Math.min(size, balance);
 
