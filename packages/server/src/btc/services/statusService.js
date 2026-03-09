@@ -5,6 +5,7 @@ import { getOpenTrade } from '../paper_trading/trader.js';
 import { fetchCollateralBalance } from '../live_trading/clob.js';
 import { getLiveLedger } from '../live_trading/ledger.js';
 import { getPacificTimeInfo } from '../domain/entryGate.js';
+import { getPositionSummary } from './positionService.js';
 
 // Diagnostic: unique ID per process instance + boot timestamp.
 // If the UI sees different instanceIds across consecutive polls, there are
@@ -105,6 +106,14 @@ export async function assembleStatus() {
       fees: engine?.executor?.feeService?.getSnapshot?.() ?? null,
       approvals: engine?.executor?.approvalService?.getStatus?.() ?? null,
     },
+    // Polymarket on-chain position data (live mode)
+    positions: await (async () => {
+      const funder = process.env.FUNDER_ADDRESS;
+      if (!funder) return null;
+      try {
+        return await getPositionSummary(funder);
+      } catch { return null; }
+    })(),
     entryThresholds: (() => {
       const { isWeekend, wd, hour } = getPacificTimeInfo();
       return {
