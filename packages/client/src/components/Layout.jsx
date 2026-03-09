@@ -25,7 +25,7 @@ function NavItem({ item, mobile = false }) {
       }
     >
       <span className={mobile ? 'text-base' : 'text-lg'}>{item.icon}</span>
-      <span className={mobile ? 'leading-none' : 'hidden whitespace-nowrap text-sm font-medium group-hover/sidebar:block'}>
+      <span className={mobile ? 'leading-none' : 'whitespace-nowrap text-sm font-medium'}>
         {item.label}
       </span>
     </NavLink>
@@ -35,8 +35,8 @@ function NavItem({ item, mobile = false }) {
 export default function Layout({ children }) {
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      <aside className="group/sidebar hidden w-[60px] flex-col border-r border-slate-700 bg-slate-800 p-2 transition-all duration-300 hover:w-[220px] md:flex">
-        <div className="mb-4 hidden truncate px-2 pt-2 text-xs uppercase tracking-widest text-slate-400 group-hover/sidebar:block">
+      <aside className="hidden w-[220px] flex-col border-r border-slate-700 bg-slate-800 p-2 md:flex">
+        <div className="mb-4 truncate px-2 pt-2 text-xs uppercase tracking-widest text-slate-400">
           Polymarket Dashboard
         </div>
         <nav className="space-y-1">
