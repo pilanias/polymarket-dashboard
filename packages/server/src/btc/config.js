@@ -150,8 +150,9 @@ export const CONFIG = {
     // When enabled, maxLoss = contractSize * dynamicStopLossPct, clamped to [minMaxLossUsd, maxMaxLossUsd].
     // When disabled, the fixed maxLossUsdPerTrade above is used (backward compat).
     // Example: $80 trade * 0.20 = $16 max loss; $250 trade * 0.20 = $40 (ceiling).
-    // ALL OR NOTHING: no stop loss, ride to settlement. Hardcoded false.
-    dynamicStopLossEnabled: false,
+    // Dynamic stop loss: scales with Kelly position size.
+    // 20% of position: $25 trade → $5 SL, $100 trade → $20 SL, $200 trade → $40 SL
+    dynamicStopLossEnabled: true,
     // Tightened from 18% to 12%: 101-trade analysis showed max loss trades (-$521)
     // wiping all trailing TP profit (+$503). 75% of max losses never went green.
     // At $120 position: 12% = $14.40 max loss (was $21.60 at 18%).
@@ -169,7 +170,7 @@ export const CONFIG = {
 
     // Tightened from 12% to 8%: simulation showed $76 saved over 20 max-loss trades
     // Tightened: risk $5 instead of $8. At 30% MFE $5+ rate, breakeven ~50% WR
-    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.06,
+    dynamicStopLossPct: Number(process.env.DYNAMIC_STOP_LOSS_PCT) || 0.20,
     minMaxLossUsd: Number(process.env.MIN_MAX_LOSS_USD) || 5,
     maxMaxLossUsd: Number(process.env.MAX_MAX_LOSS_USD) || 12,
 
