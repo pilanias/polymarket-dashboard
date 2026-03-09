@@ -1,0 +1,189 @@
+# BTC 5-Minute Trader — Changelog
+
+## 2026-03-09 — v2.0: R/R Fix + LLM Active Test
+
+### The Big Fix
+- **Take profit was 8%, not 15%** — config had `takeProfitPct: 0.08` which was getting read instead of the 0.15 in exitEvaluator. Average win was $6.61 vs average loss $13.75. Impossible to be profitable.
+- Fixed: `takeProfitPct: 0.15` hardcoded in config.js
+- Result: 18 trades post-fix, 50% WR, **+$19.01**. Avg win $11.44 vs avg loss $9.33.
+
+### LLM Signal (Active → Shadow)
+- Wired Claude Haiku as signal #8 in momentum model with weight 4 (heaviest)
+- Upgraded prompt with 15-minute candle structure, support/resistance, momentum exhaustion
+- **Result: LLM was useless** — 52% WR when agreeing with momentum, 56% when disagreeing
+- Reverted to shadow mode. Still logging predictions for future evaluation.
+
+### Entry Delay
+- Bot now waits until 2.5 minutes left in market before entering
+- LLM fires at 3 minutes left (2 min of price data before predicting)
+- Entry window: 2:30 → 0:10 (force exit at 250s)
+
+### Other Changes
+- Stop loss ceiling raised: `maxMaxLossUsd` $12 → $50 (was capping all SLs to $12)
+- Max drawdown disabled for paper trading
+- Rec=NO_TRADE blocker: removed then restored (caused over-trading without it)
+- Fixed Haiku model ID: `claude-haiku-4-5-20251001` (old 3.5 IDs retired)
+
+### Archived: `llm-active-8pct-tp-v1`
+- 87 trades, 54% WR, -$239.19, PF 0.57
+- Avg win $6.61, avg loss $13.75 (R/R was 1:2 backwards)
+
+---
+
+## 2026-03-08 — v1.12: Kelly Sizing + LLM Shadow + Percentage-Based Exits
+
+### Fractional Kelly Position Sizing
+- Pure Kelly formula: `f = α × (2p − 1)` where α = 0.25 (quarter Kelly)
+- 55% confidence → $25, 60% → $50, 65% → $75, 70% → $100, 80% → $150
+- Clamped to [$25, $250] and [2%, 25%] of balance
+- Replaces flat 8% stake
+
+### Percentage-Based TP/SL
+- All exit thresholds now percentage of position, not fixed dollar
+- TP tiers: 15%/10%/5%/2% at time thresholds (later simplified to flat 15%)
+- Dynamic SL: 20% of position (floor $3, ceiling $50)
+- Scales naturally with Kelly — bigger positions, bigger absolute thresholds
+
+### LLM Shadow Signal
+- Claude Haiku (`claude-haiku-4-5-20251001`) predicts direction once per market
+- ~$0.58/day estimated cost
+- Cached per market slug, 5s timeout
+- Stored in trade extraJson for offline analysis
+
+### Max Drawdown Circuit Breaker
+- 15% of starting balance (at $1000: trips at $850)
+- Later disabled for paper trading
+
+### UI Updates (React)
+- Added: Trading Session, Kelly Size, Orderbook Imbalance, LLM Signal, Time Left
+- Removed: RSI, Impulse, Range20, Entry Px, Opp Px, Edge, Prob gates (stale)
+
+---
+
+## 2026-03-07 — v1.11: Tiered Take Profit + $20 Stop Loss
+
+### Data-Driven Tiered TP
+- Simulated over 120 trades: +$794 vs settlement-only
+- Winners peak at 234s, losers at 99s
+- Tiers: $15+ immediately, $10+ after 60s, $5+ after 120s, $2+ after 180s, force exit at 250s
+- Later converted to percentage-based
+
+### $20 Stop Loss
+- Zero false stops in 70-trade simulation
+- Every trade hitting -$20 never recovered (18 stopped trades, 0 would have won)
+- Turns -$244 into +$64 in simulation
+
+### Entry Filters Opened Wide
+- Stripped all 25+ filters
+- Only 3 gates remain: one trade per market, no open position, valid data
+- Momentum model trades freely
+
+### Archived Versions
+- `tiered-tp-no-sl-v1` — 72 trades, first test of tiered TP
+- `tiered-tp-sl20-open-filters-v1` — 207 weekend trades, 60% WR but -$533
+
+---
+
+## 2026-03-06 — v1.10: Momentum Model + All-or-Nothing Test
+
+### Momentum Model Deployed
+- Replaces broken probability model (31% direction accuracy — actively harmful)
+- 8 weighted signals: BTC spot 5s/15s/60s, Polymarket momentum 30s, price level, tick acceleration, orderbook imbalance, settlement trend
+- Total weight: 18
+
+### All-or-Nothing Mode
+- No TP, no SL, ride every trade to settlement
+- Killed time stop (loserMaxHoldSeconds) — was the #1 hidden profit killer
+- Both-sides strategy tested and rejected (UP + DOWN > $1 due to vig)
+
+### PnL Trajectory Tracking
+- Samples every 2s during open trades
+- Tracks: timesPositive, timePositiveSec, peakPnl, peakAtSec, pnlAtIntervals
+- Key finding: 86% of trades go green (MFE ≥ $1), 50% hit +$20
+
+### Archived: `momentum-all-or-nothing-v1` — 211 trades
+
+---
+
+## 2026-03-04 — v1.9: Tightened R/R + Trade Archive
+
+### R/R Adjustments
+- Stop $8 → $5, trailing start $3 → $5, fixed TP 5% → 6%
+- Later: stop loss tightened 12% → 8%, trailing drawdowns widened 40%
+
+### Trade Archive System
+- `tradeArchive.js` — archive trades with version tag and stats
+- API: `POST /archive`, `GET /archive/versions`, `GET /archive/trades/:version`
+- Never lose historical data across config changes
+
+### v1.0.7 Restored (and Failed)
+- Rolled back to best historical config (PF 1.50)
+- 107 trades, 27.1% WR, PF 0.56, -$211 — old model was broken
+
+---
+
+## 2026-03-03 — v1.8: One Trade Per Market + Small Balance Test
+
+### One Trade Per Market
+- Fixed: was re-entering same market after exit
+- Changes across entryGate.js, TradingState.js, config.js
+
+### Small Balance Test ($50)
+- 15 trades, 46.7% WR, -$11.33
+- Positions too small ($6-18), spread kills you
+- Conclusion: minimum viable balance ~$200-500
+
+### Balance Settled at $500, then $1000
+- stakePct 35% → 20%, positions ~$100
+- Proven sweet spot for paper trading
+
+---
+
+## 2026-02-26 — v1.5: Data-Driven Tuning
+
+### 234-Trade Analysis
+- v1.0.5: 46% WR, PF 0.97, -$19.60 (near breakeven)
+- Trailing TP: 81% WR, +$599 — profit engine
+- Max Loss: 0% WR, -$618 — the whole problem
+- Entries < 40¢: 29% WR — raised floor
+
+---
+
+## 2026-02-25 — v1.0.4: Initial Profitability Fixes
+
+### First Analysis (84 trades)
+- DOWN trades more profitable
+- Entries > 60¢ perform better
+- Trailing TP is the profit engine (+$243 net)
+- Max Loss is the problem (-$368 net)
+- Trade duration avg 21 seconds
+
+### Changes
+- Trailing TP tightened: start $20 → $3, drawdown $10 → $1.50
+- Dynamic stop loss: 20% → 12%, ceiling $40 → $20
+- RSI overbought/oversold filter
+- Probability thresholds raised
+- Min entry price floor: 0.05 → 0.35
+- MFE/MAE persistence bug fixed
+- Balance/summary/dailyPnl syncs from Supabase on boot
+
+---
+
+## Hard-Won Lessons
+
+1. **Stop loss saves 10x more than it costs** — most important feature
+2. **TP must be ≥ SL percentage** — 8% TP with 20% SL = guaranteed loss regardless of WR
+3. **Don't loosen all filters at once** — impossible to know what changed
+4. **Trailing TP has $5-19 slippage on Polymarket** — fixed TP is better
+5. **Time Stop was the #1 hidden profit killer** — 120s hold cut trades with +$15 MFE at -$5
+6. **Old probability model was actively harmful** — 31% direction accuracy
+7. **TP/SL must scale with position size** — fixed $ doesn't work with Kelly sizing
+8. **Hardcode critical config values** — DO env vars silently override config.js
+9. **Weekend data is unreliable** — wider spreads, thinner liquidity, different conditions
+10. **One trade per market is essential** — multiple entries = giving back gains
+11. **Minimum viable balance ~$200-500** — $50 doesn't work, spread kills tiny positions
+12. **Don't churn config** — each change resets the dataset, need 100+ trades minimum
+13. **Buying both sides = guaranteed loss** — UP + DOWN > $1 due to vig
+14. **Profit protection > perfect entries** — 86% of trades go green, the problem is giving it back
+15. **Chainlink aggregators rotate** — always resolve from proxy dynamically
+16. **Supabase is source of truth** — local JSON ledger is ephemeral on DO

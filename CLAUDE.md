@@ -1,128 +1,131 @@
 # Polymarket Dashboard — Unified Monorepo
 
 ## Overview
-This is a monorepo combining two existing Polymarket trading bots into a single React + Express application:
-- **BTC 5-Min Trader** — high-frequency BTC price prediction bot (existing repo: `~/Dev/polymarket-btc-5m-assistant`)
-- **Weather Bot** — temperature prediction bot across 12 cities (existing repo: `~/Dev/polymarket-weather-bot`)
+Monorepo combining two Polymarket trading bots with a React dashboard:
+- **BTC 5-Min Trader** — momentum-based direction prediction for 5-minute BTC markets
+- **Weather Bot** — temperature prediction across 12 cities
+
+**Live:** https://polymarket-dashboard-ip4ea.ondigitalocean.app
 
 ## Architecture
 
 ```
 packages/
-├── client/          # React + Vite frontend
-│   ├── src/
-│   │   ├── main.jsx
-│   │   ├── App.jsx           # Router + layout
-│   │   ├── api/
-│   │   │   ├── btc.js        # fetch wrappers for /api/btc/*
-│   │   │   └── weather.js    # fetch wrappers for /api/weather/*
-│   │   ├── hooks/
-│   │   │   └── useApi.js     # generic fetch hook with loading/error
-│   │   ├── components/
-│   │   │   ├── Layout.jsx    # sidebar nav + main content area
-│   │   │   ├── StatusBadge.jsx
-│   │   │   ├── TradeTable.jsx
-│   │   │   └── StatCard.jsx
-│   │   └── pages/
-│   │       ├── Overview.jsx      # combined P&L summary
-│   │       ├── BtcDashboard.jsx  # replicate existing BTC dashboard
-│   │       ├── BtcTrades.jsx     # trade history table
-│   │       ├── BtcAnalytics.jsx  # analytics charts
-│   │       ├── WeatherDashboard.jsx  # replicate existing weather dashboard
-│   │       └── WeatherTrades.jsx     # weather trade history
-│   └── package.json
-├── server/          # Unified Express backend
-│   ├── src/
-│   │   ├── index.js          # Express app, mounts route groups
-│   │   ├── routes/
-│   │   │   ├── btc.js        # Router mounting all BTC endpoints under /api/btc
-│   │   │   └── weather.js    # Router mounting all weather endpoints under /api/weather
-│   │   └── middleware/
-│   │       └── errorHandler.js
-│   └── package.json
-└── shared/          # Shared utilities (optional, for later)
-    └── package.json
+├── client/                    # React 19 + Vite + Tailwind v4 + Recharts
+│   └── src/
+│       ├── pages/
+│       │   ├── Btc.jsx        # Main BTC dashboard (gate status, signals, P&L)
+│       │   ├── Trades.jsx     # Trade history table
+│       │   └── Analytics.jsx  # Performance charts
+│       ├── hooks/useApi.js    # Fetch hook (5s poll, no loading flash)
+│       └── api/               # Fetch wrappers for /api/*
+├── server/
+│   └── src/
+│       ├── index.js           # Express app, mounts routes, serves static
+│       ├── btc/
+│       │   ├── index.js       # Main tick loop (~1s), signal aggregation
+│       │   ├── boot.js        # Auto-start trading, quiet mode
+│       │   ├── config.js      # ALL config (hardcoded critical values)
+│       │   ├── engines/
+│       │   │   ├── momentum.js          # 8-signal weighted model (primary)
+│       │   │   ├── llmSignal.js         # Claude Haiku shadow predictor
+│       │   │   ├── orderbookImbalance.js # Polymarket orderbook
+│       │   │   └── edge.js              # Edge-based entry decisions
+│       │   ├── domain/
+│       │   │   ├── entryGate.js         # Entry validation gates
+│       │   │   └── exitEvaluator.js     # TP/SL/force exit logic
+│       │   ├── application/
+│       │   │   ├── TradingEngine.js     # Core orchestration
+│       │   │   └── TradingState.js      # Balance + state management
+│       │   ├── paper_trading/
+│       │   │   └── trader.js            # Paper execution + Kelly sizing
+│       │   └── infrastructure/
+│       │       └── persistence/
+│       │           └── tradeArchive.js  # Version-tagged archiving
+│       └── weather/                     # Weather bot (Supabase)
+└── shared/
 ```
 
 ## Tech Stack
 - **Frontend:** React 19, Vite, React Router v7, Tailwind CSS v4, Recharts
 - **Backend:** Express 5, Node.js ESM
-- **BTC persistence:** Supabase (PostgreSQL) — existing
-- **Weather persistence:** SQLite (better-sqlite3) — existing
+- **Database:** Supabase (PostgreSQL) — source of truth for both bots
+- **Price Feed:** Chainlink BTC/USD via Polygon WebSocket
+- **Deploy:** DigitalOcean App Platform, auto-deploy from main
+
+## Current BTC Trading Config (v2.0)
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Model | Momentum (8 signals) | BTC spot 5s/15s/60s, Poly momentum/level, tick accel, orderbook, settlement |
+| Position Sizing | Quarter Kelly (α=0.25) | 55%→$25, 60%→$50, 65%→$75, 70%→$100, 80%→$150 |
+| Take Profit | 15% of position | Hardcoded, no env override |
+| Stop Loss | 20% of position | Dynamic, floor $3, ceiling $50 |
+| Force Exit | 250 seconds | Don't ride losses to settlement |
+| Entry Delay | 2.5 min left | Wait for direction to establish |
+| LLM Signal | Shadow mode | Claude Haiku, fires at 3 min left, logged but doesn't trade |
+| Entry Filters | Minimal | One trade/market, no open position, valid data |
+| Starting Balance | $1,000 (paper) | Kelly sizes positions from this |
 
 ## Key Rules
 
-### Backend Strategy
-The backend is a **thin proxy layer**. Do NOT rewrite any trading logic.
+### DO NOT
+- Override critical config via env vars (hardcode in config.js)
+- Trade multiple times in the same 5-minute market
+- Use trailing TP (Polymarket has $5-19 slippage)
+- Trust weekend data (wider spreads, thinner liquidity)
+- Churn config — need 100+ trades to evaluate changes
 
-1. Import existing service modules directly from the source repos using relative paths initially
-2. Mount BTC routes at `/api/btc/*` and weather routes at `/api/weather/*`
-3. Add `/api/health` for combined health check
-4. The server should:
-   - For BTC: Initialize the trading engine (import from btc-5m-assistant src)
-   - For Weather: Initialize the tick loop (import from weather-bot src)
+### ALWAYS
+- Archive trades before config changes (`POST /api/btc/archive`)
+- Hardcode critical values in config.js
+- Co-author commits: `Co-Authored-By: Claude Opus 4 <noreply@anthropic.com>`
+- Check that TP% ≥ SL% (otherwise guaranteed loss at any WR)
+- Resolve Chainlink aggregator dynamically from proxy
 
-For MVP, the server files in `packages/server/src/routes/` should contain Express Router instances that replicate the endpoint logic from the original servers, importing services from the original project directories.
+## API Routes
 
-### Frontend Strategy
-1. Use Tailwind for styling — dark theme, clean dashboard look
-2. Use Recharts for any charts (P&L over time, trade distribution)
-3. React Router for page navigation with sidebar layout
-4. API calls go through `packages/client/src/api/` modules
-5. Vite dev server proxies `/api` to Express backend
+### BTC (`/api/btc/*`)
+- `GET /status` — current state, signals, gate status
+- `GET /trades` — trade history from Supabase
+- `POST /trading/start` / `/trading/stop` — enable/disable
+- `POST /archive` — archive trades with version tag
+- `GET /archive/versions` — list archived versions
+- `GET /archive/trades/:version` — retrieve archived trades
+- `GET /config/current` — current config values
 
-### API Route Mapping
+### Weather (`/api/weather/*`)
+- `GET /status` — bot state, active positions
+- `GET /trades` — trade history
+- `POST /trading/start` / `/trading/stop`
+- `POST /tick` — manual tick trigger
 
-**BTC routes (mount at `/api/btc`):**
-- GET /status
-- GET /trades
-- GET /analytics
-- POST /backtest
-- GET /live/trades
-- GET /live/open-orders
-- GET /live/positions
-- GET /live/analytics
-- GET /markets
-- GET /portfolio
-- GET /orders
-- DELETE /orders/:id
-- GET /metrics
-- GET /diagnostics
-- POST /optimizer
-- POST /config
-- POST /config/revert
-- GET /config/current
-- GET /suggestions
-- POST /suggestions/apply
-- GET /suggestions/tracking
-- GET /kill-switch/status
-- POST /kill-switch/override
-- POST /trading/start
-- POST /trading/stop
-- POST /trading/kill
-- GET /trading/status
-- POST /mode
+### System
+- `GET /api/health` — combined health check
+- `GET /api/analytics/combined` — cross-bot analytics
 
-**Weather routes (mount at `/api/weather`):**
-- GET /status
-- GET /trades
-- GET /trades/:id
-- GET /summary
-- GET /calibration
-- POST /tick
-- POST /mode
-- POST /kill
+## Development
 
-### Code Style
+```bash
+npm install --workspaces    # Install all
+npm run dev                 # Dev mode (client + server)
+npm run build               # Production build
+npm start                   # Production server on :4000
+```
+
+## Deploy
+DO App Platform auto-deploys from `main`:
+```
+Build: npm install --workspaces && npm run build
+Run:   npm start
+```
+
+Required env vars: `PRIVATE_KEY`, `CLOB_API_KEY`, `CLOB_SECRET`, `CLOB_PASSPHRASE`, `CLOB_HOST`, `CHAIN_ID`, `SIGNATURE_TYPE`, `FUNDER_ADDRESS`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `POLYGON_WSS_URLS`
+
+Optional: `ANTHROPIC_API_KEY` (LLM shadow signal)
+
+## Code Style
 - ESM imports (`import`/`export`)
-- Functional React components with hooks
-- No class components
+- Functional React with hooks
 - Consistent JSON responses: `{ ok: true, data }` or `{ ok: false, error: { message } }`
-- Handle errors in every route with try/catch
-
-### Commit Convention
-```
-type(scope): description
-
-Co-Authored-By: Claude Opus 4 <noreply@anthropic.com>
-```
+- Commit convention: `type(scope): description`
