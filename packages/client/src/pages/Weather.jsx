@@ -92,17 +92,25 @@ export default function Weather() {
   const cityRows = normalizeCityRows(rolling.byCity);
 
   const openPositions = useMemo(() => {
-    return (trades || []).filter((trade) => String(trade.status || '').toUpperCase() === 'OPEN');
+    return (trades || [])
+      .filter((trade) => String(trade.status || '').toUpperCase() === 'OPEN')
+      .sort((a, b) => {
+        const dateA = a.event_date || a.created_at || '';
+        const dateB = b.event_date || b.created_at || '';
+        return dateB.localeCompare(dateA);
+      });
   }, [trades]);
 
   const resolvedTrades = useMemo(() => {
     return (trades || [])
       .filter((trade) => ['WIN', 'LOSS'].includes(String(trade.result || '').toUpperCase()))
-      .sort(
-        (a, b) =>
-          new Date(b.resolved_at || b.created_at || 0).getTime() -
-          new Date(a.resolved_at || a.created_at || 0).getTime()
-      );
+      .sort((a, b) => {
+        const dateA = a.event_date || '';
+        const dateB = b.event_date || '';
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+        return new Date(b.resolved_at || b.created_at || 0).getTime() -
+          new Date(a.resolved_at || a.created_at || 0).getTime();
+      });
   }, [trades]);
 
   const filteredResolved = useMemo(() => {
