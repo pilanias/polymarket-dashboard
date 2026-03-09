@@ -592,7 +592,9 @@ export async function startApp({ skipServer = false } = {}) {
     const activeTimeAware = { adjustedUp: activeModelUp, adjustedDown: activeModelDown };
     // ── LLM Signal (shadow mode — logs prediction, doesn't influence trades) ──
     const currentSlug = polySnapshot.ok ? (polySnapshot.market?.slug ?? null) : null;
-    if (currentSlug && currentSlug !== _lastLlmSlug) {
+    // Fire LLM at ~3 min left — gives 2 min of price data and response ready before 2.5 min entry window
+    const llmReady = currentSlug && currentSlug !== _lastLlmSlug && timeLeftMin !== null && timeLeftMin <= 3.0;
+    if (llmReady) {
       _lastLlmSlug = currentSlug;
       clearLlmCache();
       // Fire LLM call async — result cached for this market window
