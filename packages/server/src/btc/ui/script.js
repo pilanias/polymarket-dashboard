@@ -635,49 +635,19 @@ document.addEventListener('DOMContentLoaded', () => {
           // Build gate rows: [label, currentStr, passStr, thresholdStr]
           const gateRows = [];
 
+          // Trading Session (based on UTC hour)
+          const utcHour = new Date().getUTCHours();
+          let tradingSession = '';
+          if (utcHour >= 0 && utcHour < 8) tradingSession = '🌏 Asia (Tokyo/Sydney)';
+          else if (utcHour >= 8 && utcHour < 13) tradingSession = '🇬🇧 London';
+          else if (utcHour >= 13 && utcHour < 17) tradingSession = '🇬🇧🇺🇸 London/NY Overlap';
+          else if (utcHour >= 17 && utcHour < 22) tradingSession = '🇺🇸 New York';
+          else tradingSession = '🌙 After Hours';
+          gateRows.push(['Session', tradingSession, '—', '']);
+
           // Rec
           const recOk = rt.recAction === 'ENTER';
           gateRows.push(['Rec', `${rt.recAction || '—'} ${rt.recSide || ''} (${phase})`, pass(recOk), 'ENTER']);
-
-          // Probability
-          if (modelProb != null) {
-            const probOk = modelProb >= effMinProbW;
-            gateRows.push(['Prob', pctS(modelProb), pass(probOk), `>= ${pctS(effMinProbW)}`]);
-          } else {
-            gateRows.push(['Prob', '—', na, `>= ${pctS(effMinProbW)}`]);
-          }
-
-          // Edge
-          if (edge != null) {
-            const edgeOk = edge >= effEdgeW;
-            gateRows.push(['Edge', pctS(edge), pass(edgeOk), `>= ${pctS(effEdgeW)}`]);
-          } else {
-            gateRows.push(['Edge', '—', na, `>= ${pctS(effEdgeW)}`]);
-          }
-
-          // RSI
-          if (rsi != null) {
-            const inBand = rsi >= (thr.noTradeRsiMin ?? 30) && rsi < (thr.noTradeRsiMax ?? 45);
-            gateRows.push(['RSI', rsi.toFixed(1), pass(!inBand), `outside ${thr.noTradeRsiMin}-${thr.noTradeRsiMax}`]);
-          } else {
-            gateRows.push(['RSI', '—', na, `outside ${thr.noTradeRsiMin}-${thr.noTradeRsiMax}`]);
-          }
-
-          // Impulse
-          if (impulseAbs != null) {
-            const impulseOk = impulseAbs >= (thr.minBtcImpulsePct1m ?? 0);
-            gateRows.push(['Impulse', `${(impulseAbs * 100).toFixed(3)}%`, pass(impulseOk), `>= ${((thr.minBtcImpulsePct1m ?? 0) * 100).toFixed(3)}%`]);
-          } else {
-            gateRows.push(['Impulse', '—', na, `>= ${((thr.minBtcImpulsePct1m ?? 0) * 100).toFixed(3)}%`]);
-          }
-
-          // Range (volatility)
-          if (range != null) {
-            const rangeOk = range >= effMinRange;
-            gateRows.push(['Range20', `${(range * 100).toFixed(3)}%`, pass(rangeOk), `>= ${(effMinRange * 100).toFixed(3)}%`]);
-          } else {
-            gateRows.push(['Range20', '—', na, `>= ${(effMinRange * 100).toFixed(3)}%`]);
-          }
 
           // Conviction (model max prob)
           if (modelMax != null) {
@@ -685,6 +655,16 @@ document.addEventListener('DOMContentLoaded', () => {
             gateRows.push(['Conviction', pctS(modelMax), pass(convOk), `>= ${pctS(effMinModelMax)}`]);
           } else {
             gateRows.push(['Conviction', '—', na, `>= ${pctS(effMinModelMax)}`]);
+          }
+
+          // Kelly Position Size
+          if (modelProb != null) {
+            const alpha = 0.25;
+            const kellyPct = modelProb > 0.5 ? alpha * (2 * modelProb - 1) : 0;
+            const clampedPct = Math.max(0.02, Math.min(0.25, kellyPct));
+            const balance = m.balance?.balance ?? 1000;
+            const posSize = Math.floor(balance * clampedPct);
+            gateRows.push(['Kelly Size', `$${posSize} (${(clampedPct * 100).toFixed(1)}%)`, '—', '']);
           }
 
           // Spread
@@ -703,24 +683,24 @@ document.addEventListener('DOMContentLoaded', () => {
             gateRows.push(['Liquidity', '—', na, `>= $${Number(effMinLiq).toLocaleString()}`]);
           }
 
-          // Entry price
-          if (entryPolyPrice != null) {
-            const epOk = entryPolyPrice <= (thr.maxEntryPolyPrice ?? 0.65);
-            gateRows.push(['Entry Px', c(entryPolyPrice), pass(epOk), `<= ${c(thr.maxEntryPolyPrice ?? 0.65)}`]);
-          } else {
-            gateRows.push(['Entry Px', '—', na, `<= ${c(thr.maxEntryPolyPrice ?? 0.65)}`]);
+          // Orderbook Imbalance
+          const obImb = rt.momentumSignals?.orderbookImbalance;
+          if (obImb != null) {
+            const obDir = obImb > 0.1 ? '🟢 Buyers' : obImb < -0.1 ? '🔴 Sellers' : '⚪ Neutral';
+            gateRows.push(['Orderbook', `${obDir} (${(obImb * 100).toFixed(0)}%)`, '—', '']);
           }
 
-          // Opposite price
-          if (oppPolyPrice != null) {
-            const opOk = oppPolyPrice >= (thr.minOppositePolyPrice ?? 0.10);
-            gateRows.push(['Opp Px', c(oppPolyPrice), pass(opOk), `>= ${c(thr.minOppositePolyPrice ?? 0.10)}`]);
+          // LLM Prediction (shadow)
+          const llm = rt.llmPrediction;
+          if (llm) {
+            const llmIcon = llm.direction === 'UP' ? '🟢' : '🔴';
+            gateRows.push(['LLM Signal', `${llmIcon} ${llm.direction} (${(llm.confidence * 100).toFixed(0)}%)`, '—', 'shadow']);
           }
 
           // Time
           if (tlm != null) {
-            const timeOk = tlm >= (thr.noEntryFinalMinutes ?? 1.5);
-            gateRows.push(['Time', `${tlm.toFixed(1)}m`, pass(timeOk), `>= ${thr.noEntryFinalMinutes ?? 1.5}m`]);
+            const timeOk = tlm >= (thr.noEntryFinalMinutes ?? 0);
+            gateRows.push(['Time Left', `${tlm.toFixed(1)}m`, pass(timeOk), `>= ${thr.noEntryFinalMinutes ?? 0}m`]);
           }
 
           // Candles
