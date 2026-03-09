@@ -222,7 +222,7 @@ export const CONFIG = {
 
     // Max Drawdown breaker: stop trading if session drawdown exceeds this % of starting balance.
     // 15% = stop if $500 balance drops to $425. Prevents catastrophic loss spirals.
-    maxDrawdownPct: 0.15,
+    maxDrawdownPct: 0, // disabled for paper trading
 
     // If true: after a Max Loss stopout, do not enter again until the market rolls to the next slug.
     // One trade per market: after any exit (win or lose), skip rest of this 5m market.
