@@ -108,10 +108,9 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
     return { blockers, effectiveSide: null, sideInferred: false };
   }
 
-  // Non-strict: note the rec action but continue checking
-  if (!strictRec && rec?.action !== 'ENTER') {
-    blockers.push(`Rec=${rec?.action || 'NONE'} (loose)`);
-  }
+  // Non-strict: log but don't block. The momentum model picks direction.
+  // (Previously this was a blocker, but it blocked valid trades when
+  //  market price diverged from model price — e.g., 85¢ UP markets)
 
   // ── 2. Side resolution ─────────────────────────────────────────
   let effectiveSide = rec?.side ?? null;
