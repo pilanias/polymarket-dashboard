@@ -8,7 +8,7 @@
  */
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-haiku-3-5-20241022';
+const MODEL = 'claude-3-5-haiku-20241022';
 const TIMEOUT_MS = 5_000;
 
 // Cache: one prediction per market slug
