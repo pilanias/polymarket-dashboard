@@ -314,6 +314,13 @@ export class TradingEngine {
 
     this.state.hasOpenPosition = false;
 
+    // ── 4b. Sync balance for MDD breaker ───────────────────────
+    if (this.executor?.getBalanceSnapshot) {
+      const snap = this.executor.getBalanceSnapshot();
+      this.state.startingBalance = snap.starting ?? null;
+      this.state.currentBalance = snap.balance ?? null;
+    }
+
     // ── 5. Entry evaluation ────────────────────────────────────
     const candleCount = Array.isArray(klines1m) ? klines1m.length : 0;
     const { blockers, effectiveSide, sideInferred } = computeEntryBlockers(

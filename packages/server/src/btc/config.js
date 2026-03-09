@@ -84,6 +84,12 @@ export const CONFIG = {
     minTradeUsd: Number(process.env.MIN_TRADE_USD) || 25,
     maxTradeUsd: Number(process.env.MAX_TRADE_USD) || 250,
 
+    // Fractional Kelly sizing: scale position by model confidence.
+    // Quarter Kelly (0.25) is standard for volatile markets.
+    // Multiplier clamped to [0.3x, 2.0x] of base stakePct.
+    kellyEnabled: true,
+    kellyFraction: 0.25,
+
     // Back-compat (legacy fixed size). If stakePct is set, we use dynamic sizing.
     contractSize: Number(process.env.PAPER_CONTRACT_SIZE) || 100,
 
@@ -212,6 +218,10 @@ export const CONFIG = {
     // Loosened circuit breaker
     circuitBreakerConsecutiveLosses: Number(process.env.CIRCUIT_BREAKER_LOSSES) || 8,
     circuitBreakerCooldownMs: Number(process.env.CIRCUIT_BREAKER_COOLDOWN_MS) || 2 * 60_000, // 2 minutes
+
+    // Max Drawdown breaker: stop trading if session drawdown exceeds this % of starting balance.
+    // 15% = stop if $500 balance drops to $425. Prevents catastrophic loss spirals.
+    maxDrawdownPct: 0.15,
 
     // If true: after a Max Loss stopout, do not enter again until the market rolls to the next slug.
     // One trade per market: after any exit (win or lose), skip rest of this 5m market.

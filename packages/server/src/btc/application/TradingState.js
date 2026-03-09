@@ -43,6 +43,12 @@ export class TradingState {
     /** @type {boolean} */
     this.hasOpenPosition = false;
 
+    // ── Balance tracking (set by engine each tick for MDD breaker) ──
+    /** @type {number|null} */
+    this.startingBalance = null;
+    /** @type {number|null} */
+    this.currentBalance = null;
+
     // ── Per-position MFE/MAE tracking ───────────────────────────
     /** @type {Map<string, number>} positionId -> max unrealized PnL */
     this._mfeByPos = new Map();

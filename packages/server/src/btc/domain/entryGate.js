@@ -480,6 +480,19 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
     }
   }
 
+  // ── 23b. Max Drawdown circuit breaker ─────────────────────────
+  // Block new trades if session drawdown exceeds threshold (e.g., 15% of starting balance).
+  // Prevents catastrophic loss spirals. Resets on manual re-enable or daily reset.
+  const mddPct = config.maxDrawdownPct ?? 0.15; // 15% of starting balance
+  if (mddPct > 0 && isNum(state.startingBalance) && state.startingBalance > 0) {
+    const currentBalance = isNum(state.currentBalance) ? state.currentBalance
+      : (state.startingBalance + (state.todayRealizedPnl ?? 0));
+    const drawdownPct = (state.startingBalance - currentBalance) / state.startingBalance;
+    if (drawdownPct >= mddPct) {
+      blockers.push(`Max drawdown breaker (${(drawdownPct * 100).toFixed(1)}% >= ${(mddPct * 100).toFixed(0)}% of $${state.startingBalance})`);
+    }
+  }
+
   // ── 24. Circuit breaker (consecutive losses) ─────────────────
   const cbMaxLosses = config.circuitBreakerConsecutiveLosses ?? 0;
   const cbCooldownMs = config.circuitBreakerCooldownMs ?? 5 * 60_000;
