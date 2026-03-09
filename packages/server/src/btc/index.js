@@ -35,6 +35,7 @@ import { detectRegime } from "./engines/regime.js";
 import { scoreDirection, applyTimeAwareness } from "./engines/probability.js";
 import { scoreMomentum, applyTimeAwarenessMomentum, recordPolyPrice } from "./engines/momentum.js";
 import { fetchOrderbookImbalance } from "./engines/orderbookImbalance.js";
+import { getLlmPrediction, clearLlmCache } from "./engines/llmSignal.js";
 import { computeEdge, decide } from "./engines/edge.js";
 
 // Utilities and Setup
@@ -237,6 +238,7 @@ export async function startApp({ skipServer = false } = {}) {
   // getMarket thunk: lazily resolves the current Polymarket market
   let _cachedMarket = null;
   let _marketFetchedAt = 0;
+  let _lastLlmSlug = null; // Track which market slug we last called LLM for
   const getMarket = () => _cachedMarket;
   const refreshMarket = async () => {
     try {
@@ -588,6 +590,30 @@ export async function startApp({ skipServer = false } = {}) {
       ? (activeModelUp > activeModelDown ? "LONG" : "SHORT") : "NEUTRAL";
     // Override timeAware in signals with momentum model values
     const activeTimeAware = { adjustedUp: activeModelUp, adjustedDown: activeModelDown };
+    // ── LLM Signal (shadow mode — logs prediction, doesn't influence trades) ──
+    const currentSlug = polySnapshot.ok ? (polySnapshot.market?.slug ?? null) : null;
+    if (currentSlug && currentSlug !== _lastLlmSlug) {
+      _lastLlmSlug = currentSlug;
+      clearLlmCache();
+      // Fire LLM call async — result cached for this market window
+      getLlmPrediction({
+        marketSlug: currentSlug,
+        btcPrice: currentPrice,
+        priceHistory: spotTicks.slice(-10).map(t => t.price),
+        rsi: indicatorsData.rsiNow,
+        orderbookImbalance: obImbalance,
+        polyUp: polyPrices.UP,
+        polyDown: polyPrices.DOWN,
+        recentTrades: engine.executor?.recentTrades?.slice?.(-5) ?? [],
+        spotDelta1m: spotDelta1mPct,
+        spotDelta5s: momentum.signals?.spotDelta5s ?? null,
+      }).then(pred => {
+        if (pred) {
+          globalThis.__llmPrediction = pred;
+        }
+      }).catch(() => {});
+    }
+
     const signalsForTrader = buildSignals({ rec, klines1m, polySnapshot, polyPrices, marketUp, marketDown, timeLeftMin, timeAware: activeTimeAware, indicatorsData, spotNow, spotDelta1mPct, candleMeta });
 
     globalThis.__uiStatus = {
@@ -616,6 +642,8 @@ export async function startApp({ skipServer = false } = {}) {
       volumeRecent: indicatorsData.volumeRecent ?? null,
       volumeAvg: indicatorsData.volumeAvg ?? null,
       marketVolumeNum: polySnapshot.ok ? (polySnapshot.market?.volumeNum ?? null) : null,
+      // LLM shadow prediction (if available)
+      llmPrediction: globalThis.__llmPrediction ?? null,
     };
 
     // Refresh market cache for executor's getMarket() thunk
