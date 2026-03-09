@@ -396,29 +396,25 @@ export function evaluateExits(position, signals, config, graceState, nowMs) {
   //   - Otherwise: ride to settlement
   const tieredTpEnabled = config.tieredTakeProfitEnabled ?? true;
   if (tieredTpEnabled && pnlNow !== null && isNum(tradeAgeSec)) {
-    // Percentage-based tiers — scale with position size (Kelly sizing)
-    // At $100 position: 15% = $15, 10% = $10, 5% = $5, 2% = $2
-    // At $25 position:  15% = $3.75, 10% = $2.50, 5% = $1.25, 2% = $0.50
-    // At $200 position: 15% = $30, 10% = $20, 5% = $10, 2% = $4
-    const posSize = position.contractSize ?? 80; // fallback $80
-    const tiers = config.tieredTakeProfitTiers ?? [
-      { minAgeSec: 0,   minPnlPct: 0.15 },   // Big win: 15%+ immediately
-      { minAgeSec: 60,  minPnlPct: 0.10 },   // Solid win: 10%+ after 1 min
-      { minAgeSec: 120, minPnlPct: 0.05 },   // Moderate win: 5%+ after 2 min
-      { minAgeSec: 180, minPnlPct: 0.02 },   // Small win: 2%+ after 3 min
-      { minAgeSec: 250, minPnlPct: -Infinity },  // Force exit: cut losses before settlement
-    ];
-    for (const tier of tiers) {
-      const threshold = tier.minPnlPct <= -1e10 ? -Infinity : posSize * tier.minPnlPct;
-      if (tradeAgeSec >= tier.minAgeSec && pnlNow >= threshold) {
-        const tierLabel = tier.minPnlPct <= -1e10
-          ? `Force Exit @${tier.minAgeSec}s`
-          : `${(tier.minPnlPct * 100).toFixed(0)}%@${tier.minAgeSec}s ($${threshold.toFixed(2)})`;
-        result.decision = {
-          reason: `Tiered TP ($${pnlNow.toFixed(2)} after ${tradeAgeSec.toFixed(0)}s, ${tierLabel})`
-        };
-        return result;
-      }
+    // Simple percentage TP + force exit at 250s
+    const posSize = position.contractSize ?? 80;
+    const tpPct = config.takeProfitPct ?? 0.15; // 15% of position
+    const tpThreshold = posSize * tpPct;
+
+    // Take profit at 15%
+    if (pnlNow >= tpThreshold) {
+      result.decision = {
+        reason: `Take Profit ($${pnlNow.toFixed(2)}, ${(tpPct * 100).toFixed(0)}% of $${posSize.toFixed(0)})`
+      };
+      return result;
+    }
+
+    // Force exit at 250s — don't ride losses to settlement
+    if (tradeAgeSec >= 250) {
+      result.decision = {
+        reason: `Force Exit ($${pnlNow.toFixed(2)} after ${tradeAgeSec.toFixed(0)}s)`
+      };
+      return result;
     }
   }
 
