@@ -282,23 +282,10 @@ export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin, orderb
     }
   }
 
-  // ── 8. LLM Signal (weight 4 — heaviest, sees bigger picture) ────
-  const LLM_WEIGHT = 4;
+  // ── 8. LLM Signal (SHADOW MODE — logged but does not influence trades) ──
   signals.llmDirection = llmPrediction?.direction ?? null;
   signals.llmConfidence = llmPrediction?.confidence ?? null;
-
-  if (llmPrediction && llmPrediction.direction && llmPrediction.confidence > 0.5) {
-    // Scale weight by LLM confidence: 55% → 2 weight, 80% → 4 weight
-    const scaledWeight = Math.round(LLM_WEIGHT * (llmPrediction.confidence - 0.5) * 2);
-    const effectiveWeight = Math.max(1, Math.min(LLM_WEIGHT, scaledWeight));
-    
-    if (llmPrediction.direction === 'UP') {
-      upWeight += effectiveWeight;
-    } else {
-      downWeight += effectiveWeight;
-    }
-    totalWeight += effectiveWeight;
-  }
+  // Not wired into weights — collecting data to evaluate accuracy
 
   // ── Compute final probability ─────────────────────────────────
   // If no signals fired, return 50/50 (no trade)

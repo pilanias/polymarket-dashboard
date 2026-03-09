@@ -296,7 +296,7 @@ export const CONFIG = {
     ],
 
     // Legacy/unused
-    takeProfitPct: 0.18, // 18% of position — hardcoded, no env override
+    takeProfitPct: 0.15, // 15% of position — hardcoded, no env override
 
     // Dynamic exit: close when opposite side becomes more likely.
     // Example: if you're in UP and modelDown >= modelUp + exitFlipMargin AND modelDown >= exitFlipMinProb → exit.
