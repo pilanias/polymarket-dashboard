@@ -438,7 +438,7 @@ export const CONFIG = {
     // Only enter in the final X minutes of the market. 0 = disabled.
     // Late-entry strategy: wait for market to show clear direction.
     // Widened from 1.5 to 2.5 — more time for price to reach 70¢+ in the window
-    onlyEntryFinalMinutes: Number(process.env.ONLY_ENTRY_FINAL_MIN) || 0,
+    onlyEntryFinalMinutes: Number(process.env.ONLY_ENTRY_FINAL_MIN) || 2.5,
 
     // Require enough 1m candles before allowing entries (helps avoid 50/50 startup)
     minCandlesForEntry: Number(process.env.MIN_CANDLES_FOR_ENTRY) || 1,
