@@ -329,24 +329,28 @@ export default function Btc() {
         <StatCard label="Open Trades" value={String(openTrades)} />
       </section>
 
-      {/* Position Balances & Redeemable Warning (live mode) */}
-      {positions && (
+      {/* Position Balances (live mode only) + Redeemable Warning (always) */}
+      {((isLive && positions) || redeemableCount > 0) && (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">In Positions</div>
-            <div className="mt-1 text-lg font-semibold text-zinc-100">
-              {formatCurrency(totalInPositions)}
-              {positions.positionCount > 0 && (
-                <span className="ml-2 text-xs text-zinc-400">({positions.positionCount} positions)</span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
-            <div className="text-xs text-zinc-400 uppercase tracking-wide">Total Value</div>
-            <div className="mt-1 text-lg font-semibold text-zinc-100">
-              {formatCurrency(balance + totalInPositions)}
-            </div>
-          </div>
+          {isLive && (
+            <>
+              <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+                <div className="text-xs text-zinc-400 uppercase tracking-wide">In Positions</div>
+                <div className="mt-1 text-lg font-semibold text-zinc-100">
+                  {formatCurrency(totalInPositions)}
+                  {positions?.positionCount > 0 && (
+                    <span className="ml-2 text-xs text-zinc-400">({positions.positionCount} positions)</span>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+                <div className="text-xs text-zinc-400 uppercase tracking-wide">Total Value</div>
+                <div className="mt-1 text-lg font-semibold text-zinc-100">
+                  {formatCurrency(balance + totalInPositions)}
+                </div>
+              </div>
+            </>
+          )}
           {redeemableCount > 0 && (
             <div className="rounded-lg border border-red-500/50 bg-red-950/30 p-4 animate-pulse">
               <div className="text-xs text-red-400 uppercase tracking-wide font-bold">⚠️ Stuck Tokens</div>
