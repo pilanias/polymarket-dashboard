@@ -1,7 +1,7 @@
 const SETTLEMENT_SLUG_RE = /(\d{10})$/;
 const CHECK_INTERVAL_MS = 10_000; // check every 10s for tighter settlement capture
 const SETTLEMENT_GRACE_MS = 3_000; // 3s after settlement to let price stabilize
-const MAX_BACKFILL_AGE_MS = 2 * 60_000; // only backfill within 2 min (tighter window = more accurate price)
+const MAX_BACKFILL_AGE_MS = 30 * 60_000; // backfill within 30 min — Polymarket API is source of truth anyway
 
 let _lastCheckAtMs = 0;
 // Ring buffer of recent BTC prices for settlement capture
@@ -57,7 +57,7 @@ async function fetchPolymarketOutcome(marketSlug) {
     const timer = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(
       `https://gamma-api.polymarket.com/markets?slug=${encodeURIComponent(marketSlug)}`,
-      { signal: controller.signal }
+      { signal: controller.signal, headers: { 'User-Agent': 'PolyDashboard/1.0' } }
     );
     clearTimeout(timer);
     if (!res.ok) return null;
