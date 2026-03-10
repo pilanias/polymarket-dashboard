@@ -35,6 +35,10 @@ export class TradingState {
     /** @type {number|null} */
     this.lastFlipAtMs = null;
 
+    // ── Last closed trade (for cooldown logic) ────────────────
+    /** @type {{ pnl: number, exitTimeMs: number }|null} */
+    this.lastClosedTrade = null;
+
     // ── Skip market after max loss ──────────────────────────────
     /** @type {string|null} */
     this.skipMarketUntilNextSlug = null;

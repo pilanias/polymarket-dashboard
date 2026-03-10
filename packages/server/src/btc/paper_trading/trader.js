@@ -1235,6 +1235,11 @@ export class Trader {
       else this.lastWinAtMs = Date.now();
     }
 
+    // Record last closed trade for loss cooldown in entryGate
+    if (this.state) {
+      this.state.lastClosedTrade = { pnl: Number(pnl.toFixed(2)), exitTimeMs: Date.now() };
+    }
+
     // One trade per market: after ANY exit (win or lose), skip the rest of this market.
     // Prevents giving back gains with follow-up trades in the same 5-minute window.
     if (trade?.marketSlug) {

@@ -252,7 +252,14 @@ export function evaluateExits(position, signals, config, graceState, nowMs) {
       result.graceAction = 'CLEAR_GRACE';
     }
 
-    if (breached) {
+    // SL grace period — don't apply stop loss in first N seconds
+    // Data shows 52/171 trades had direction RIGHT but lost to early SL
+    // Winners avg 18s — give the trade time to develop before cutting
+    const slGraceSec = config.stopLossGraceSec ?? 20;
+    if (isNum(tradeAgeSec) && tradeAgeSec < slGraceSec) {
+      // Within grace period — skip stop loss check entirely
+      // (TP can still fire during this window)
+    } else if (breached) {
       if (okForGrace) {
         // Start grace timer once per position
         if (!graceState?.used && !graceState?.breachAtMs) {
@@ -405,6 +412,16 @@ export function evaluateExits(position, signals, config, graceState, nowMs) {
     if (pnlNow >= tpThreshold) {
       result.decision = {
         reason: `Take Profit ($${pnlNow.toFixed(2)}, ${(tpPct * 100).toFixed(0)}% of $${posSize.toFixed(0)})`
+      };
+      return result;
+    }
+
+    // Early cut — if not green by 45s, the trade is likely wrong
+    // Data: winners avg 18s, median 12s. If you're not winning fast, cut.
+    const earlyCutSec = config.earlyCutSec ?? 45;
+    if (tradeAgeSec >= earlyCutSec && pnlNow <= 0) {
+      result.decision = {
+        reason: `Early Cut ($${pnlNow.toFixed(2)} after ${tradeAgeSec.toFixed(0)}s — not green)`
       };
       return result;
     }

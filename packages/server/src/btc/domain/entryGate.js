@@ -113,6 +113,35 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
     blockers.push(`Rec=${rec?.action || 'NONE'} (loose)`);
   }
 
+  // ── 1b. Trading Hours (PST) ─────────────────────────────────────
+  // Data: 6 AM - 5 PM PST is profitable, overnight is a bloodbath
+  const tradingHoursEnabled = config.tradingHoursEnabled ?? true;
+  if (tradingHoursEnabled) {
+    const { hour: pstHour } = getPacificTimeInfo();
+    const startHour = config.tradingHoursStart ?? 6;  // 6 AM PST
+    const endHour = config.tradingHoursEnd ?? 17;     // 5 PM PST
+    if (pstHour < startHour || pstHour >= endHour) {
+      blockers.push(`Outside trading hours (${pstHour}:00 PST, allowed ${startHour}-${endHour})`);
+    }
+  }
+
+  // ── 1c. Loss Cooldown ──────────────────────────────────────────
+  // After a loss, skip the next market to avoid tilt/streak damage
+  // Data: after a loss, only 34% chance of winning next trade
+  const cooldownEnabled = config.lossCooldownEnabled ?? true;
+  if (cooldownEnabled && state) {
+    const lastTrade = state.lastClosedTrade ?? null;
+    if (lastTrade && (lastTrade.pnl ?? 0) <= 0) {
+      const cooldownMs = (config.lossCooldownMinutes ?? 5) * 60_000;
+      const lastExitMs = lastTrade.exitTimeMs ?? 0;
+      const elapsed = Date.now() - lastExitMs;
+      if (elapsed < cooldownMs) {
+        const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
+        blockers.push(`Loss cooldown (${remaining}s remaining)`);
+      }
+    }
+  }
+
   // ── 2. Side resolution ─────────────────────────────────────────
   let effectiveSide = rec?.side ?? null;
   let sideInferred = false;

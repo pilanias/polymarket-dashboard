@@ -200,6 +200,23 @@ export const CONFIG = {
     // Cooldown after a losing trade (seconds): prevents rapid back-to-back losses.
     // Reduced cooldowns for high-frequency
     lossCooldownSeconds: Number(process.env.LOSS_COOLDOWN_SECONDS) || 0,
+
+    // Trading hours (PST) — only trade during profitable hours
+    tradingHoursEnabled: true,
+    tradingHoursStart: 6,   // 6 AM PST
+    tradingHoursEnd: 17,    // 5 PM PST
+
+    // Loss cooldown — skip next market after a loss
+    lossCooldownEnabled: true,
+    lossCooldownMinutes: 5, // 5 minute cooldown after a loss
+
+    // SL grace period — don't apply stop loss for first N seconds
+    // Data: 52/171 direction-correct trades lost to early SL
+    stopLossGraceSec: 20,
+
+    // Early cut — exit if not green after N seconds
+    // Data: winners avg 18s, median 12s. Not green by 45s = likely wrong
+    earlyCutSec: 45,
     winCooldownSeconds: Number(process.env.WIN_COOLDOWN_SECONDS) || 0,
 
     // Daily loss limit: kill-switch threshold (applies to BOTH paper and live modes)
