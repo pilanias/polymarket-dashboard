@@ -1,13 +1,49 @@
 const SETTLEMENT_SLUG_RE = /(\d{10})$/;
-const CHECK_INTERVAL_MS = 30_000;
-const SETTLEMENT_GRACE_MS = 5_000;
-const MAX_BACKFILL_AGE_MS = 10 * 60_000;
+const CHECK_INTERVAL_MS = 10_000; // check every 10s for tighter settlement capture
+const SETTLEMENT_GRACE_MS = 3_000; // 3s after settlement to let price stabilize
+const MAX_BACKFILL_AGE_MS = 2 * 60_000; // only backfill within 2 min (tighter window = more accurate price)
 
 let _lastCheckAtMs = 0;
+// Ring buffer of recent BTC prices for settlement capture
+const _priceSnapshots = []; // { ts: epochMs, price: number }
+const MAX_SNAPSHOTS = 600; // ~10 min at 1/sec
 
 function toFiniteNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Record a BTC price snapshot. Call every tick (~1s) from the main loop.
+ * Used to find the closest price to the actual settlement moment.
+ */
+export function recordPriceSnapshot(price) {
+  const p = toFiniteNumber(price);
+  if (p === null) return;
+  _priceSnapshots.push({ ts: Date.now(), price: p });
+  if (_priceSnapshots.length > MAX_SNAPSHOTS) {
+    _priceSnapshots.splice(0, _priceSnapshots.length - MAX_SNAPSHOTS);
+  }
+}
+
+/**
+ * Find the BTC price closest to a given timestamp from our snapshot buffer.
+ * Returns null if no snapshot within 10s of the target.
+ */
+function getPriceAtTime(targetMs) {
+  if (_priceSnapshots.length === 0) return null;
+  let best = null;
+  let bestDiff = Infinity;
+  for (const snap of _priceSnapshots) {
+    const diff = Math.abs(snap.ts - targetMs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = snap;
+    }
+  }
+  // Only trust if within 10s of settlement
+  if (bestDiff > 10_000) return null;
+  return best?.price ?? null;
 }
 
 export function parseSettlementMsFromSlug(marketSlug) {
@@ -72,11 +108,13 @@ export async function checkSettlements({ currentPrice, nowMs = Date.now() } = {}
     const btcAtEntry = toFiniteNumber(trade.btcSpotAtEntry);
     if (btcAtEntry === null) continue;
 
-    const settlementSide = btcNow > btcAtEntry ? 'UP' : 'DOWN';
+    // Use the price closest to actual settlement time, not "current price"
+    const btcAtSettle = getPriceAtTime(settlementMs) ?? btcNow;
+    const settlementSide = btcAtSettle > btcAtEntry ? 'UP' : 'DOWN';
     const updatedTrade = {
       ...trade,
       marketSettlementTime: trade.marketSettlementTime || new Date(settlementMs).toISOString(),
-      btcAtSettlement: btcNow,
+      btcAtSettlement: btcAtSettle,
       settlementSide,
       directionCorrect: trade.side === settlementSide,
     };

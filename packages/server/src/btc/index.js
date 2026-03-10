@@ -58,7 +58,7 @@ import { getStateManager } from "./infrastructure/recovery/stateManager.js";
 import { getTradingLock } from "./infrastructure/deployment/tradingLock.js";
 import { getWebhookService } from "./infrastructure/webhooks/webhookService.js";
 import { installGracefulShutdown } from "./infrastructure/deployment/gracefulShutdown.js";
-import { checkSettlements } from "./services/settlementService.js";
+import { checkSettlements, recordPriceSnapshot } from "./services/settlementService.js";
 
 // Phase 5: Startup validation
 import { logEnvValidation } from "./infrastructure/deployment/envValidation.js";
@@ -662,6 +662,8 @@ export async function startApp({ skipServer = false } = {}) {
 
     // Unified trading engine: handles both paper and live via active executor
     await engine.processSignals(signalsForTrader, klines1m);
+    // Record price snapshot every tick for accurate settlement capture
+    recordPriceSnapshot(currentPrice);
     await checkSettlements({ currentPrice });
 
     // Phase 4: Periodic state persistence (every ~30 ticks = ~30s at 1s interval)
