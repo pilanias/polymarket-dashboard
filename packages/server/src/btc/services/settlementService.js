@@ -46,6 +46,46 @@ function getPriceAtTime(targetMs) {
   return best?.price ?? null;
 }
 
+/**
+ * Fetch the definitive outcome from Polymarket's Gamma API.
+ * Returns 'UP' or 'DOWN' if resolved, null if not yet resolved.
+ */
+async function fetchPolymarketOutcome(marketSlug) {
+  if (!marketSlug) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(
+      `https://gamma-api.polymarket.com/markets?slug=${encodeURIComponent(marketSlug)}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    const market = Array.isArray(data) ? data[0] : null;
+    if (!market) return null;
+    
+    // outcomePrices: ["1","0"] means Up won, ["0","1"] means Down won
+    // outcomes: ["Up","Down"]
+    const prices = market.outcomePrices;
+    const outcomes = market.outcomes;
+    if (!Array.isArray(prices) || !Array.isArray(outcomes)) return null;
+    
+    // Find which outcome has price "1" (the winner)
+    for (let i = 0; i < prices.length; i++) {
+      if (prices[i] === '1' || Number(prices[i]) === 1) {
+        const winner = (outcomes[i] || '').toUpperCase();
+        if (winner === 'UP' || winner === 'DOWN') return winner;
+      }
+    }
+    
+    return null; // not resolved yet or ambiguous
+  } catch {
+    return null; // timeout or network error — fall back to price snapshot
+  }
+}
+
 export function parseSettlementMsFromSlug(marketSlug) {
   const match = typeof marketSlug === 'string' ? marketSlug.match(SETTLEMENT_SLUG_RE) : null;
   if (!match) return null;
@@ -108,14 +148,28 @@ export async function checkSettlements({ currentPrice, nowMs = Date.now() } = {}
     const btcAtEntry = toFiniteNumber(trade.btcSpotAtEntry);
     if (btcAtEntry === null) continue;
 
-    // Use the price closest to actual settlement time, not "current price"
-    const btcAtSettle = getPriceAtTime(settlementMs) ?? btcNow;
-    const settlementSide = btcAtSettle > btcAtEntry ? 'UP' : 'DOWN';
+    // Try to get the definitive outcome from Polymarket API
+    const pmOutcome = await fetchPolymarketOutcome(trade.marketSlug);
+    
+    let settlementSide;
+    let btcAtSettle;
+    
+    if (pmOutcome) {
+      // Definitive: Polymarket tells us who won
+      settlementSide = pmOutcome;
+      btcAtSettle = getPriceAtTime(settlementMs) ?? btcNow; // best-effort price
+    } else {
+      // Fallback: use our price snapshot
+      btcAtSettle = getPriceAtTime(settlementMs) ?? btcNow;
+      settlementSide = btcAtSettle > btcAtEntry ? 'UP' : 'DOWN';
+    }
+
     const updatedTrade = {
       ...trade,
       marketSettlementTime: trade.marketSettlementTime || new Date(settlementMs).toISOString(),
       btcAtSettlement: btcAtSettle,
       settlementSide,
+      settlementSource: pmOutcome ? 'polymarket' : 'price-snapshot',
       directionCorrect: trade.side === settlementSide,
     };
 
