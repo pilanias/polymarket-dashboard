@@ -8,6 +8,19 @@ import {
   recalculateSummary,
 } from './ledger.js';
 
+/**
+ * Get the current trading session based on UTC hour.
+ * Asia (0-8 UTC), London (8-13), LDN-NY Overlap (13-17), New York (17-22), After Hours (22-0)
+ */
+function getTradingSession() {
+  const h = new Date().getUTCHours();
+  if (h >= 0 && h < 8) return 'Asia';
+  if (h >= 8 && h < 13) return 'London';
+  if (h >= 13 && h < 17) return 'LDN-NY Overlap';
+  if (h >= 17 && h < 22) return 'New York';
+  return 'After Hours';
+}
+
 // Core trading logic - NO fixed TP/SL, dynamic exits only
 export class Trader {
   constructor() {
@@ -727,6 +740,7 @@ export class Trader {
           contractSize: contractSizeUsd,
           status: 'OPEN',
           entryTime: new Date().toISOString(),
+          tradingSession: getTradingSession(),
           exitPrice: null,
           exitTime: null,
           pnl: 0,

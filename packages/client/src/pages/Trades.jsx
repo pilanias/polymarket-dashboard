@@ -49,6 +49,7 @@ function normalizeBtcTrades(trades) {
           : null,
     pnl: Number(trade?.pnl || 0),
     exitMeta: String(trade?.exitReason || trade?.reason || '--'),
+    session: String(trade?.tradingSession || '--'),
     result:
       trade?.result != null
         ? String(trade.result).toUpperCase()
@@ -227,6 +228,7 @@ export default function Trades() {
               <th className="px-3 py-2"><SortHeader column="entryPrice" label="Entry Price" /></th>
               <th className="px-3 py-2"><SortHeader column="exitDisplay" label="Exit Price / Result" /></th>
               <th className="px-3 py-2"><SortHeader column="pnl" label="P&L" /></th>
+              <th className="px-3 py-2"><SortHeader column="session" label="Session" /></th>
               <th className="px-3 py-2"><SortHeader column="exitMeta" label="Exit Reason / City" /></th>
             </tr>
           </thead>
@@ -253,6 +255,7 @@ export default function Trades() {
                 <td className={`px-3 py-2 font-medium ${row.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(row.pnl)}
                 </td>
+                <td className="px-3 py-2 text-slate-400">{row.session}</td>
                 <td className="px-3 py-2 text-slate-300">{row.exitMeta}</td>
               </tr>
             ))}
