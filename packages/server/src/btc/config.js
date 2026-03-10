@@ -99,17 +99,17 @@ export const CONFIG = {
     // entries at >60¢ (higher conviction) had 63% WR vs 27% at <40¢.
     // Loosened for high-frequency: bet on almost every market
     // Tightened: 75% of entries never went green. Need higher conviction.
-    minProbEarly: Number(process.env.MIN_PROB_EARLY) || 0.51,
-    minProbMid: Number(process.env.MIN_PROB_MID) || 0.51,
-    minProbLate: Number(process.env.MIN_PROB_LATE) || 0.51,
+    minProbEarly: 0.54,  // tightened from 0.51, v1.0.7 was 0.57
+    minProbMid: 0.55,    // tightened from 0.51, v1.0.7 was 0.58
+    minProbLate: 0.56,   // tightened from 0.51, v1.0.7 was 0.60
 
     // Lowered from 0.02 to 0.015: 84% of trades are EARLY phase with PF near 1.0.
     // Slightly looser edge lets more volume through where timing advantage is highest.
     // Minimal edge requirements — let volume flow
     // Tightened: need real edge, not noise
-    edgeEarly: Number(process.env.EDGE_EARLY) || 0.001,
-    edgeMid: Number(process.env.EDGE_MID) || 0.001,
-    edgeLate: Number(process.env.EDGE_LATE) || 0.001,
+    edgeEarly: 0.008,   // tightened from 0.001, v1.0.7 was 0.015
+    edgeMid: 0.015,     // tightened from 0.001, v1.0.7 was 0.03
+    edgeLate: 0.025,    // tightened from 0.001, v1.0.7 was 0.05
 
     // Extra strictness knobs (used to improve odds without killing trade count)
     // MID entries tend to be weaker; require a bit more strength.
@@ -378,7 +378,7 @@ export const CONFIG = {
     minPolyPrice: 0.40, // skip low-conviction entries — hardcoded
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
     // Tightened: above 70¢ the upside is capped and risk is high
-    maxEntryPolyPrice: Number(process.env.MAX_ENTRY_POLY_PRICE) || 0.95,
+    maxEntryPolyPrice: 0.75, // tightened from 0.95, v1.0.7 was 0.65 — hardcoded
     minOppositePolyPrice: Number(process.env.MIN_OPPOSITE_POLY_PRICE) || 0.01,
 
     // Chop/volatility filter (BTC reference): block entries when recent movement is too small.

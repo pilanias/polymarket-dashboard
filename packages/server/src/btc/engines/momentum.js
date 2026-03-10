@@ -282,7 +282,69 @@ export function scoreMomentum({ spotTicks, polyUp, polyDown, timeLeftMin, orderb
     }
   }
 
-  // ── 8. LLM Signal (SHADOW MODE — logged but does not influence trades) ──
+  // ── 8. Contrarian at Extremes — weight 3 ─────────────────────
+  // When one side is priced very high (>85¢), bet on mean reversion.
+  // Markets at extremes tend to overcorrect. Contrarian to signal #4 (price level).
+  const CONTRARIAN_WEIGHT = 3;
+
+  if (typeof polyUp === 'number' && typeof polyDown === 'number') {
+    signals.contrarianTriggered = null;
+
+    if (polyUp > 0.85) {
+      // UP is very expensive — contrarian says DOWN
+      downWeight += CONTRARIAN_WEIGHT;
+      totalWeight += CONTRARIAN_WEIGHT;
+      signals.contrarianTriggered = 'DOWN';
+      signals.contrarianReason = `UP@${(polyUp * 100).toFixed(0)}¢ → mean reversion`;
+    } else if (polyDown > 0.85) {
+      // DOWN is very expensive — contrarian says UP
+      upWeight += CONTRARIAN_WEIGHT;
+      totalWeight += CONTRARIAN_WEIGHT;
+      signals.contrarianTriggered = 'UP';
+      signals.contrarianReason = `DOWN@${(polyDown * 100).toFixed(0)}¢ → mean reversion`;
+    }
+
+    // Extra contrarian weight at extreme extremes (>92¢)
+    if (polyUp > 0.92) {
+      downWeight += 2;
+      totalWeight += 2;
+    } else if (polyDown > 0.92) {
+      upWeight += 2;
+      totalWeight += 2;
+    }
+  }
+
+  // ── 9. Orderbook Midpoint Trend — weight 2 ──────────────────
+  // Compare first-half vs second-half midpoint averages over 60s.
+  // If midpoint is rising, buyers are winning the book.
+  const MIDPOINT_WEIGHT = 2;
+
+  if (polyHistory.up.length >= 30) {
+    const recent = polyHistory.up.slice(-60); // last 60 ticks (~60s)
+    const half = Math.floor(recent.length / 2);
+    const firstHalf = recent.slice(0, half);
+    const secondHalf = recent.slice(half);
+
+    const avgFirst = firstHalf.reduce((s, p) => s + p.price, 0) / firstHalf.length;
+    const avgSecond = secondHalf.reduce((s, p) => s + p.price, 0) / secondHalf.length;
+    const midpointDelta = avgSecond - avgFirst;
+
+    signals.midpointDelta = midpointDelta;
+    signals.midpointFirstHalf = avgFirst;
+    signals.midpointSecondHalf = avgSecond;
+
+    // Meaningful shift: > 0.5¢ change in average
+    if (Math.abs(midpointDelta) > 0.005) {
+      if (midpointDelta > 0) {
+        upWeight += MIDPOINT_WEIGHT;
+      } else {
+        downWeight += MIDPOINT_WEIGHT;
+      }
+      totalWeight += MIDPOINT_WEIGHT;
+    }
+  }
+
+  // ── 10. LLM Signal (SHADOW MODE — logged but does not influence trades) ──
   signals.llmDirection = llmPrediction?.direction ?? null;
   signals.llmConfidence = llmPrediction?.confidence ?? null;
   // Not wired into weights — collecting data to evaluate accuracy

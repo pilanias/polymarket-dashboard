@@ -59,6 +59,7 @@ import { getTradingLock } from "./infrastructure/deployment/tradingLock.js";
 import { getWebhookService } from "./infrastructure/webhooks/webhookService.js";
 import { installGracefulShutdown } from "./infrastructure/deployment/gracefulShutdown.js";
 import { checkSettlements, recordPriceSnapshot } from "./services/settlementService.js";
+import { checkAndRedeem } from "./services/redeemService.js";
 
 // Phase 5: Startup validation
 import { logEnvValidation } from "./infrastructure/deployment/envValidation.js";
@@ -665,6 +666,9 @@ export async function startApp({ skipServer = false } = {}) {
     // Record price snapshot every tick for accurate settlement capture
     recordPriceSnapshot(currentPrice);
     await checkSettlements({ currentPrice });
+
+    // Auto-redeem resolved positions (checks every 5 min)
+    await checkAndRedeem();
 
     // Phase 4: Periodic state persistence (every ~30 ticks = ~30s at 1s interval)
     _statePersistCounter++;
