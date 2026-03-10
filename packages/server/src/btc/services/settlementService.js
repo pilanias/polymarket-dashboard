@@ -91,7 +91,9 @@ export function parseSettlementMsFromSlug(marketSlug) {
   if (!match) return null;
   const tsSec = Number(match[1]);
   if (!Number.isFinite(tsSec)) return null;
-  return tsSec * 1000;
+  // Slug epoch is the MARKET START time, not settlement.
+  // Settlement is 5 minutes (300s) after market opens.
+  return (tsSec + 300) * 1000;
 }
 
 export function deriveMarketSettlementTime(marketSlug) {
