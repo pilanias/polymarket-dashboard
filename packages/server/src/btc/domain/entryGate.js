@@ -125,19 +125,22 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
     }
   }
 
-  // ── 1c. Loss Cooldown ──────────────────────────────────────────
-  // After a loss, skip the next market to avoid tilt/streak damage
-  // Data: after a loss, only 34% chance of winning next trade
+  // ── 1c. Escalating Loss Cooldown ────────────────────────────────
+  // After consecutive losses, cooldown grows: 5 min → 10 min → 15 min
+  // Data: after a loss, only 34% chance of winning next. Streaks cluster.
   const cooldownEnabled = config.lossCooldownEnabled ?? true;
   if (cooldownEnabled && state) {
     const lastTrade = state.lastClosedTrade ?? null;
     if (lastTrade && (lastTrade.pnl ?? 0) <= 0) {
-      const cooldownMs = (config.lossCooldownMinutes ?? 5) * 60_000;
+      const streak = state.consecutiveLosses ?? 1;
+      const baseMins = config.lossCooldownMinutes ?? 5;
+      const cooldownMins = Math.min(baseMins * streak, 30); // cap at 30 min
+      const cooldownMs = cooldownMins * 60_000;
       const lastExitMs = lastTrade.exitTimeMs ?? 0;
       const elapsed = Date.now() - lastExitMs;
       if (elapsed < cooldownMs) {
         const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
-        blockers.push(`Loss cooldown (${remaining}s remaining)`);
+        blockers.push(`Loss cooldown (${remaining}s, streak ${streak}, ${cooldownMins}min)`);
       }
     }
   }

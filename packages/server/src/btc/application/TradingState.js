@@ -39,6 +39,9 @@ export class TradingState {
     /** @type {{ pnl: number, exitTimeMs: number }|null} */
     this.lastClosedTrade = null;
 
+    /** @type {number} Consecutive losses (resets on a win) */
+    this.consecutiveLosses = 0;
+
     // ── Skip market after max loss ──────────────────────────────
     /** @type {string|null} */
     this.skipMarketUntilNextSlug = null;

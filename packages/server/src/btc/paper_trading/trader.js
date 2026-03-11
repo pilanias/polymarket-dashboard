@@ -1235,9 +1235,15 @@ export class Trader {
       else this.lastWinAtMs = Date.now();
     }
 
-    // Record last closed trade for loss cooldown in entryGate
+    // Record last closed trade for escalating loss cooldown in entryGate
     if (this.state) {
       this.state.lastClosedTrade = { pnl: Number(pnl.toFixed(2)), exitTimeMs: Date.now() };
+      if (pnl <= 0) {
+        this.state.consecutiveLosses = (this.state.consecutiveLosses ?? 0) + 1;
+        console.log(`[BTC] Consecutive losses: ${this.state.consecutiveLosses} (cooldown ${Math.min(5 * this.state.consecutiveLosses, 30)}min)`);
+      } else {
+        this.state.consecutiveLosses = 0;
+      }
     }
 
     // One trade per market: after ANY exit (win or lose), skip the rest of this market.
