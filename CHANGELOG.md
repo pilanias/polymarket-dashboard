@@ -1,5 +1,43 @@
 # BTC 5-Minute Trader — Changelog
 
+## 2026-03-10 — v2.1: Data-Driven Trading Controls
+
+### Deep Analysis (171-trade archive: `15pct-tp-open-filters-v1`)
+- 35.3% WR, -$278.29, PF 0.77
+- 65-75¢ entries were worst bucket: 20% WR, -$104
+- 52 trades had CORRECT direction but lost to early SL
+- 35% of losers went green (MFE > $1), 10 had MFE > $8
+- DOWN much worse than UP: 31% WR/-$192 vs 40%/-$79
+- Winners are fast: avg 18s hold, median 12s
+- Best hours: 1 PM PST (69% WR), 8 AM (56%). Worst: overnight (0-29%)
+- After a loss, only 34% chance of winning next trade
+
+### New Features
+- **Trading Hours** (`3c6b8e1`): 6 AM - 5 PM PST only. Overnight was -$200+
+- **Escalating Loss Cooldown** (`b192d06`): 5 min after 1st loss, 10 after 2nd, 15 after 3rd, caps at 30 min. Resets on any win
+- **SL Grace Period** (`3c6b8e1`): No stop loss for first 20s — fixes "direction right but lost"
+- **Early Cut** (`3c6b8e1`): Exit if not green by 45s. Winners avg 18s; if not winning fast, cut
+
+### Bug Fixes
+- **Settlement timing fix** (`f4ad1be`): Slug epoch is market START, not settlement. Was filling settlement data 5 minutes early with wrong BTC price. All prior direction accuracy data was likely wrong.
+
+### Config (as of `b192d06`)
+- `tradingHoursEnabled: true` (6 AM - 5 PM PST)
+- `lossCooldownEnabled: true`, `lossCooldownMinutes: 5` (escalates per consecutive loss)
+- `stopLossGraceSec: 20`
+- `earlyCutSec: 45`
+- Entry thresholds tightened halfway: prob 0.54/0.55/0.56, edge 0.008/0.015/0.025
+- `maxEntryPolyPrice: 0.75` (was 0.95)
+
+### Known Issues
+- Live mode trade display shows raw CLOB data (MAKER, CONFIRMED, Invalid Date). Paper display is correct.
+- Historical direction accuracy data is unreliable due to settlement timing bug (now fixed going forward)
+
+### Archived: `15pct-tp-open-filters-v1`
+- 170 trades, 35.3% WR, -$278.29, PF 0.77
+
+---
+
 ## 2026-03-09 — v2.0: R/R Fix + LLM Active Test
 
 ### The Big Fix
