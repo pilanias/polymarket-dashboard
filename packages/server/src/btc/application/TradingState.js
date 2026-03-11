@@ -196,6 +196,8 @@ export class TradingState {
         this.lastWinAtMs = now;
         this.consecutiveLosses = 0; // Reset on any non-loss
       }
+      // Track last closed trade for escalating cooldown in entryGate
+      this.lastClosedTrade = { pnl, exitTimeMs: now };
     }
 
     // One trade per market: skip re-entry for rest of this market slug after ANY exit
