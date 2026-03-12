@@ -18,6 +18,7 @@ import { CONFIG } from '../config.js';
 import { getPacificTimeInfo } from '../domain/entryGate.js';
 import { generateSuggestions } from '../services/suggestionService.js';
 import { archiveTrades, getConfigVersions, getArchivedTrades } from '../infrastructure/persistence/tradeArchive.js';
+import { getRedeemStatus } from '../services/redeemService.js';
 
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
@@ -929,6 +930,10 @@ router.post('/trading/kill', async (req, res) => {
     cancelResult,
     timestamp: new Date().toISOString(),
   }));
+});
+
+router.get('/redeem-status', (req, res) => {
+  res.json(ok(getRedeemStatus()));
 });
 
 router.get('/trading/status', (req, res) => {
