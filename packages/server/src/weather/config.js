@@ -99,19 +99,59 @@ export const CITIES = [
   },
 ];
 
+// Short-range models: highest resolution, best for 0-48hr forecasts
+// Global models: lower resolution but work for 3+ day forecasts
+// The blending function uses both — short-range models that return data
+// for the target date are included alongside global models.
 export const MODEL_CANDIDATES = {
-  London: ["icon_eu", "ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Dallas: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Atlanta: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  NYC: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Seoul: ["jma_gsm", "jma_msm", "ecmwf_ifs025", "icon_global", "cma_grapes_global", "gem_global"],
-  Chicago: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Miami: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Houston: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Phoenix: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  Denver: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  "Los Angeles": ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
-  "San Francisco": ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  London: {
+    shortRange: ["icon_eu"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Dallas: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Atlanta: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  NYC: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Seoul: {
+    shortRange: ["jma_msm"],
+    global: ["jma_gsm", "ecmwf_ifs025", "icon_global", "cma_grapes_global", "gem_global"],
+  },
+  Chicago: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Miami: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Houston: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Phoenix: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  Denver: {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  "Los Angeles": {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
+  "San Francisco": {
+    shortRange: ["ncep_hrrr_conus", "ncep_nam_conus"],
+    global: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  },
 };
 
 export const BASE_BANKROLL = 100;

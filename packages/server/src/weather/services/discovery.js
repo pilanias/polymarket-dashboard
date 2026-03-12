@@ -72,7 +72,18 @@ function dayTempsFromHourly(hourly, dateStr) {
 
 export async function forecastHourlyBlended(lat, lon, tz, models, targetDate = null) {
   const dateStr = targetDate || getLocalDateString(tz);
-  const selectedModels = Array.isArray(models) ? models : [];
+
+  // models can be an array (legacy) or { shortRange: [...], global: [...] }
+  let selectedModels;
+  if (Array.isArray(models)) {
+    selectedModels = models;
+  } else if (models && typeof models === "object") {
+    // Combine short-range + global — short-range models that don't have
+    // data for the target date will simply fail and get filtered out.
+    selectedModels = [...(models.shortRange || []), ...(models.global || [])];
+  } else {
+    selectedModels = [];
+  }
 
   const modelCalls = selectedModels.map(async (model) => {
     const url =
