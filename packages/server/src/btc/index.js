@@ -268,7 +268,9 @@ export async function startApp({ skipServer = false } = {}) {
   const modeManager = new ModeManager({
     paperExecutor,
     liveExecutor,
-    initialMode: CONFIG.liveTrading?.enabled ? 'live' : 'paper',
+    // Always boot into paper mode — live must be explicitly enabled via UI
+    // LIVE_TRADING_ENABLED env var makes live AVAILABLE, not default
+    initialMode: 'paper',
   });
 
   const activeExecutor = modeManager.getActiveExecutor();
