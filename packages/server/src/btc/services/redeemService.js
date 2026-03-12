@@ -137,6 +137,7 @@ export async function checkAndRedeem() {
       console.log(`[Redeem] Redeemed ${redeemed} positions (~$${totalValue.toFixed(2)})`);
     }
   } catch (err) {
+    _lastError = { conditionId: 'setup', error: err.message, stack: err.stack?.split('\n').slice(0,3).join(' | '), at: new Date().toISOString() };
     if (err.name === 'AbortError') {
       console.warn('[Redeem] Data API timeout');
     } else {
