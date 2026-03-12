@@ -14,8 +14,13 @@
 
 import { ethers } from 'ethers';
 
-// Polygon PoS RPC (with fallback)
-const POLYGON_RPC = process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com';
+// Polygon PoS RPC (with fallback chain)
+const POLYGON_RPCS = [
+  process.env.POLYGON_RPC_URL,
+  'https://polygon-bor-rpc.publicnode.com',
+  'https://polygon.llamarpc.com',
+  'https://polygon-rpc.com',
+].filter(Boolean);
 
 // Polymarket CTF Contract on Polygon
 const CTF_ADDRESS = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
@@ -80,10 +85,26 @@ export async function checkAndRedeem() {
 
     console.log(`[Redeem] Found ${redeemable.length} redeemable positions`);
 
-    // 2. Connect to Polygon (ethers v5)
-    const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC);
-    const wallet = new ethers.Wallet(privateKey, provider);
-    const ctf = new ethers.Contract(CTF_ADDRESS, CTF_ABI, wallet);
+    // 2. Connect to Polygon (ethers v5) — try multiple RPCs
+    let provider, wallet, ctf;
+    for (const rpc of POLYGON_RPCS) {
+      try {
+        provider = new ethers.providers.JsonRpcProvider(rpc);
+        await provider.getNetwork(); // test connection
+        wallet = new ethers.Wallet(privateKey, provider);
+        ctf = new ethers.Contract(CTF_ADDRESS, CTF_ABI, wallet);
+        console.log(`[Redeem] Connected to Polygon via ${rpc}`);
+        break;
+      } catch (rpcErr) {
+        console.warn(`[Redeem] RPC failed: ${rpc} — ${rpcErr.message}`);
+        provider = null;
+      }
+    }
+    if (!provider) {
+      _lastError = { conditionId: 'setup', error: 'All Polygon RPCs failed', at: new Date().toISOString() };
+      console.error('[Redeem] All Polygon RPCs failed');
+      return;
+    }
 
     // Check MATIC balance for gas
     const maticBal = await provider.getBalance(wallet.address);
