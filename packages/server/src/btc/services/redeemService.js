@@ -131,12 +131,25 @@ export async function checkAndRedeem() {
 
         console.log(`[Redeem] Redeeming condition ${conditionId.slice(0, 10)}...`);
 
+        // Get current gas prices (EIP-1559 for Polygon)
+        const feeData = await provider.getFeeData();
+        const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || ethers.utils.parseUnits('30', 'gwei');
+        const maxFeePerGas = feeData.maxFeePerGas || ethers.utils.parseUnits('35', 'gwei');
+        const finalMaxFee = maxFeePerGas.mul(150).div(100);
+        const finalPriorityFee = maxPriorityFeePerGas.mul(150).div(100);
+        
+        console.log(`[Redeem] Gas: maxFee ${ethers.utils.formatUnits(finalMaxFee, 'gwei')} gwei, priority ${ethers.utils.formatUnits(finalPriorityFee, 'gwei')} gwei`);
+        
         const tx = await ctf.redeemPositions(
           USDC_ADDRESS,
           parentCollectionId,
           conditionId,
           indexSets,
-          { gasLimit: 300000 }
+          { 
+            gasLimit: 300000,
+            maxFeePerGas: finalMaxFee,
+            maxPriorityFeePerGas: finalPriorityFee
+          }
         );
 
         const receipt = await tx.wait();
