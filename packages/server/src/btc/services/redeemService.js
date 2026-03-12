@@ -131,12 +131,15 @@ export async function checkAndRedeem() {
 
         console.log(`[Redeem] Redeeming condition ${conditionId.slice(0, 10)}...`);
 
-        // Get current gas prices (EIP-1559 for Polygon)
+        // Get current gas prices (Polygon needs 25+ gwei tip minimum)
         const feeData = await provider.getFeeData();
-        const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || ethers.utils.parseUnits('30', 'gwei');
-        const maxFeePerGas = feeData.maxFeePerGas || ethers.utils.parseUnits('35', 'gwei');
-        const finalMaxFee = maxFeePerGas.mul(150).div(100);
-        const finalPriorityFee = maxPriorityFeePerGas.mul(150).div(100);
+        const MIN_TIP = ethers.utils.parseUnits('30', 'gwei');
+        const MIN_FEE = ethers.utils.parseUnits('50', 'gwei');
+        const rawPriority = feeData.maxPriorityFeePerGas || MIN_TIP;
+        const rawMaxFee = feeData.maxFeePerGas || MIN_FEE;
+        // Enforce Polygon minimums — RPCs return stale low values
+        const finalPriorityFee = rawPriority.lt(MIN_TIP) ? MIN_TIP : rawPriority;
+        const finalMaxFee = rawMaxFee.lt(MIN_FEE) ? MIN_FEE : rawMaxFee;
         
         console.log(`[Redeem] Gas: maxFee ${ethers.utils.formatUnits(finalMaxFee, 'gwei')} gwei, priority ${ethers.utils.formatUnits(finalPriorityFee, 'gwei')} gwei`);
         
