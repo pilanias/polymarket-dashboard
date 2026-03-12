@@ -351,7 +351,7 @@ export default function Btc() {
               </div>
             </>
           )}
-          {redeemableCount > 0 && (
+          {redeemableCount > 0 && totalRedeemable > 0 && (
             <div className="rounded-lg border border-red-500/50 bg-red-950/30 p-4 animate-pulse">
               <div className="text-xs text-red-400 uppercase tracking-wide font-bold">⚠️ Stuck Tokens</div>
               <div className="mt-1 text-lg font-semibold text-red-300">

@@ -47,23 +47,36 @@ export async function getPositionSummary(userAddress) {
     const active = [];
 
     for (const pos of allPositions) {
-      // Redeemable: market resolved, user has winning tokens
-      if (pos.redeemable && Number(pos.size || 0) > 0) {
+      const size = Number(pos.size || 0);
+      if (size <= 0) continue;
+
+      if (pos.redeemable) {
+        // Redeemable: market resolved. But only WINNING side has value.
+        // pos.payout > 0 means winning side. If no payout field, check curPrice.
+        // Losing side tokens settle at $0 — share count ≠ dollar value.
+        const payout = Number(pos.payout || 0);
+        const curPrice = Number(pos.curPrice || pos.price || 0);
+        // Winning tokens: payout > 0, or curPrice ~ 1.0
+        const isWinner = payout > 0 || curPrice > 0.5;
+        const value = isWinner ? (payout > 0 ? payout : size) : 0;
+
         redeemable.push({
           market: pos.market?.question || pos.conditionId || 'Unknown',
           conditionId: pos.conditionId,
-          size: Number(pos.size || 0),
+          size,
           outcome: pos.outcome || pos.asset,
-          value: Number(pos.payout || pos.size || 0), // approximate USDC value
+          value,
+          isWinner,
         });
-      } else if (Number(pos.size || 0) > 0) {
+      } else {
+        const curPrice = Number(pos.curPrice || pos.price || 0);
         active.push({
           market: pos.market?.question || pos.conditionId || 'Unknown',
           conditionId: pos.conditionId,
-          size: Number(pos.size || 0),
+          size,
           outcome: pos.outcome || pos.asset,
-          currentPrice: Number(pos.curPrice || pos.price || 0),
-          value: Number(pos.size || 0) * Number(pos.curPrice || pos.price || 0),
+          currentPrice: curPrice,
+          value: size * curPrice,
         });
       }
     }
