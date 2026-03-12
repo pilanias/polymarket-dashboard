@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { killWeather, setWeatherMode, startWeatherTrading, stopWeatherTrading, triggerWeatherTick } from '../api/weather.js';
 import StatCard from '../components/StatCard.jsx';
-import StatusPill from '../components/StatusPill.jsx';
 import useApi from '../hooks/useApi.js';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -51,20 +50,31 @@ function normalizeCityRows(byCity) {
 }
 
 export default function Weather() {
-  const { data: status, loading, refetch: refetchStatus } = useApi('/api/weather/status');
+  const { data: status, refetch: refetchStatus } = useApi('/api/weather/status');
   const { data: trades, refetch: refetchTrades } = useApi('/api/weather/trades');
   const { data: summary, refetch: refetchSummary } = useApi('/api/weather/summary');
 
   const [cityFilter, setCityFilter] = useState('ALL');
   const [resultFilter, setResultFilter] = useState('ALL');
   const [pageSize, setPageSize] = useState(20);
+  const [showLiveConfirm, setShowLiveConfirm] = useState(false);
 
   async function refreshAll() {
     await Promise.all([refetchStatus(), refetchTrades(), refetchSummary()]);
   }
 
-  async function changeMode(event) {
-    await setWeatherMode(event.target.value);
+  async function changeMode(newMode) {
+    if (newMode === 'live' && !isLive) {
+      setShowLiveConfirm(true);
+      return;
+    }
+    await setWeatherMode(newMode);
+    await refreshAll();
+  }
+
+  async function confirmLiveMode() {
+    await setWeatherMode('live');
+    setShowLiveConfirm(false);
     await refreshAll();
   }
 
@@ -129,6 +139,7 @@ export default function Weather() {
   ).sort();
 
   const isTrading = !!status?.tradingEnabled;
+  const isLive = String(status?.tradingMode || 'paper').toUpperCase() === 'LIVE';
   const balance = Number(status?.bankroll || 0);
   const realized = Number(rolling.pnl || 0);
   const openTrades = Number(status?.openTrades || 0);
@@ -137,60 +148,94 @@ export default function Weather() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 p-4">
-        <label className="text-xs uppercase tracking-wide text-slate-400" htmlFor="weather-mode">
-          Mode
-        </label>
-        <select
-          id="weather-mode"
-          value={String(status?.tradingMode || 'paper').toLowerCase()}
-          onChange={changeMode}
-          className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-sm"
-        >
-          <option value="paper">Paper</option>
-          <option value="live">Live</option>
-        </select>
-
-        <StatusPill
-          label="Trading"
-          value={loading ? 'Loading' : status?.tradingEnabled ? 'ON' : 'OFF'}
-          variant={status?.tradingEnabled ? 'success' : 'danger'}
-        />
-
-        <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={handleStart}
-            disabled={isTrading}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
-              isTrading
-                ? 'cursor-not-allowed bg-slate-600 opacity-50'
-                : 'bg-emerald-600 hover:bg-emerald-500'
-            }`}
-          >
-            Start
-          </button>
-          <button
-            type="button"
-            onClick={handleStop}
-            disabled={!isTrading}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
-              !isTrading
-                ? 'cursor-not-allowed bg-slate-600 opacity-50'
-                : 'bg-red-600 hover:bg-red-500'
-            }`}
-          >
-            Stop
-          </button>
-          <button
-            type="button"
-            onClick={handleTick}
-            className="rounded-md bg-slate-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-600"
-          >
-            Run Tick
-          </button>
+      {/* Live Mode Confirmation Dialog */}
+      {showLiveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="max-w-sm rounded-xl border border-orange-500/50 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-orange-400">⚠️ Switch to Live Trading?</h3>
+            <p className="mt-2 text-sm text-slate-300">This will use real USDC from your Polymarket wallet.</p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-400">
+              <li>• Max per trade: <span className="text-white font-medium">4% of bankroll</span></li>
+              <li>• Max daily exposure: <span className="text-white font-medium">25%</span></li>
+              <li>• Daily loss stop: <span className="text-white font-medium">5%</span></li>
+            </ul>
+            <div className="mt-4 flex gap-3">
+              <button onClick={confirmLiveMode} className="flex-1 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500">
+                Yes, Go Live
+              </button>
+              <button onClick={() => setShowLiveConfirm(false)} className="flex-1 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-600">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* Trading Status Banner */}
+      {(() => {
+        let bannerColor, bannerBg, bannerBorder, dotColor, statusText, statusDetail;
+
+        if (!isTrading) {
+          bannerColor = 'text-red-400'; bannerBg = 'bg-red-950/40'; bannerBorder = 'border-red-500/30';
+          dotColor = 'bg-red-500'; statusText = 'STOPPED'; statusDetail = 'Trading is disabled';
+        } else {
+          bannerColor = 'text-emerald-400'; bannerBg = 'bg-emerald-950/40'; bannerBorder = 'border-emerald-500/30';
+          dotColor = 'bg-emerald-500'; statusText = 'TRADING';
+          statusDetail = status?.lastTickAt
+            ? `Last tick: ${new Date(status.lastTickAt).toLocaleTimeString()}`
+            : 'Scanning for entries';
+        }
+
+        return (
+          <section className={`flex items-center gap-3 rounded-lg border ${bannerBorder} ${bannerBg} px-4 py-3`}>
+            <span className="relative flex h-3 w-3">
+              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${dotColor} opacity-75`} />
+              <span className={`relative inline-flex h-3 w-3 rounded-full ${dotColor}`} />
+            </span>
+            <span className={`text-sm font-bold uppercase tracking-wider ${bannerColor}`}>{statusText}</span>
+            <span className="text-xs text-slate-400">{statusDetail}</span>
+
+            <div className="ml-auto flex items-center gap-3">
+              {/* Paper/Live Toggle Switch */}
+              <button
+                onClick={() => isLive ? changeMode('paper') : setShowLiveConfirm(true)}
+                className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                  isLive ? 'bg-orange-600' : 'bg-emerald-600'
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                  isLive ? 'translate-x-8' : 'translate-x-1'
+                }`} />
+              </button>
+              <span className={`text-xs font-bold uppercase tracking-wider ${isLive ? 'text-orange-400' : 'text-emerald-400'}`}>
+                {isLive ? 'LIVE' : 'PAPER'}
+              </span>
+
+              {/* Start/Stop */}
+              <button
+                type="button"
+                onClick={isTrading ? handleStop : handleStart}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium text-white transition-colors ${
+                  isTrading
+                    ? 'bg-red-600 hover:bg-red-500'
+                    : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                {isTrading ? 'Stop' : 'Start'}
+              </button>
+
+              {/* Run Tick (weather-specific) */}
+              <button
+                type="button"
+                onClick={handleTick}
+                className="rounded-lg bg-slate-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-600"
+              >
+                Run Tick
+              </button>
+            </div>
+          </section>
+        );
+      })()}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Balance" value={formatCurrency(balance)} />
