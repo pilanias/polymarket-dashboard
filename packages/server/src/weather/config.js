@@ -100,18 +100,18 @@ export const CITIES = [
 ];
 
 export const MODEL_CANDIDATES = {
-  London: ["ukmo_uk_deterministic", "icon_eu", "ecmwf_ifs025", "gfs025"],
-  Dallas: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  Atlanta: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  NYC: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  Seoul: ["ecmwf_ifs025", "icon_global", "gfs025"],
-  Chicago: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  Miami: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  Houston: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  Phoenix: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  Denver: ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  "Los Angeles": ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
-  "San Francisco": ["hrrr", "nam_conus", "ecmwf_ifs025", "gfs025"],
+  London: ["icon_eu", "ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Dallas: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Atlanta: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  NYC: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Seoul: ["jma_gsm", "jma_msm", "ecmwf_ifs025", "icon_global", "cma_grapes_global", "gem_global"],
+  Chicago: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Miami: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Houston: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Phoenix: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  Denver: ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  "Los Angeles": ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
+  "San Francisco": ["ecmwf_ifs025", "gfs_seamless", "icon_global", "gem_global"],
 };
 
 export const BASE_BANKROLL = 100;
