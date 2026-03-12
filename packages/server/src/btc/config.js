@@ -215,8 +215,9 @@ export const CONFIG = {
     stopLossGraceSec: 20,
 
     // Early cut — exit if not green after N seconds
-    // Data: winners avg 18s, median 12s. Not green by 45s = likely wrong
-    earlyCutSec: 45,
+    // Data: winners avg 18s, median 12s. Not green by 30s = likely wrong
+    // v2.1 data: 45s only fired once. Tightened to 30s.
+    earlyCutSec: 30,
     winCooldownSeconds: Number(process.env.WIN_COOLDOWN_SECONDS) || 0,
 
     // Daily loss limit: kill-switch threshold (applies to BOTH paper and live modes)
@@ -395,7 +396,7 @@ export const CONFIG = {
     minPolyPrice: 0.40, // skip low-conviction entries — hardcoded
     maxPolyPrice: Number(process.env.MAX_POLY_PRICE) || 0.95,
     // Tightened: above 70¢ the upside is capped and risk is high
-    maxEntryPolyPrice: 0.75, // tightened from 0.95, v1.0.7 was 0.65 — hardcoded
+    maxEntryPolyPrice: 0.60, // v2.1 data: 60-75¢ was 38% WR/-$40. v1.0.7 was 0.65 — hardcoded
     minOppositePolyPrice: Number(process.env.MIN_OPPOSITE_POLY_PRICE) || 0.01,
 
     // Chop/volatility filter (BTC reference): block entries when recent movement is too small.

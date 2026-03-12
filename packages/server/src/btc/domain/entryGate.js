@@ -131,8 +131,8 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
   const cooldownEnabled = config.lossCooldownEnabled ?? true;
   if (cooldownEnabled && state) {
     const lastTrade = state.lastClosedTrade ?? null;
-    if (lastTrade && (lastTrade.pnl ?? 0) <= 0) {
-      const streak = state.consecutiveLosses ?? 1;
+    const streak = state.consecutiveLosses ?? 0;
+    if (lastTrade && (lastTrade.pnl ?? 0) <= 0 && streak > 0) {
       const baseMins = config.lossCooldownMinutes ?? 5;
       const cooldownMins = Math.min(baseMins * streak, 30); // cap at 30 min
       const cooldownMs = cooldownMins * 60_000;
@@ -141,6 +141,8 @@ export function computeEntryBlockers(signals, config, state, candleCount) {
       if (elapsed < cooldownMs) {
         const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
         blockers.push(`Loss cooldown (${remaining}s, streak ${streak}, ${cooldownMins}min)`);
+      } else {
+        console.log(`[Cooldown] Expired: streak=${streak}, waited ${(elapsed/60000).toFixed(1)}min of ${cooldownMins}min`);
       }
     }
   }
