@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import { setBtcMode, startBtcTrading, stopBtcTrading } from '../api/btc.js';
 import StatCard from '../components/StatCard.jsx';
-import StatusPill from '../components/StatusPill.jsx';
+// StatusPill removed — replaced by inline Trading Status Banner
 import useApi from '../hooks/useApi.js';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -184,8 +184,21 @@ export default function Btc() {
     await Promise.all([refetchStatus(), refetchKill(), refetchTrades(), refetchOpenOrders()]);
   }
 
+  const [showLiveConfirm, setShowLiveConfirm] = useState(false);
+
   async function changeMode(event) {
-    await setBtcMode(event.target.value);
+    const newMode = event.target.value;
+    if (newMode === 'live' && !isLive) {
+      setShowLiveConfirm(true);
+      return;
+    }
+    await setBtcMode(newMode);
+    await refreshAll();
+  }
+
+  async function confirmLiveMode() {
+    await setBtcMode('live');
+    setShowLiveConfirm(false);
     await refreshAll();
   }
 
@@ -262,59 +275,112 @@ export default function Btc() {
 
   return (
     <div className="space-y-6">
-      {/* Controls Bar */}
-      <section className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 p-4">
-        <label className="text-xs uppercase tracking-wide text-slate-400" htmlFor="btc-mode">
-          Mode
-        </label>
-        <select
-          id="btc-mode"
-          value={String(status?.mode || 'PAPER').toLowerCase()}
-          onChange={changeMode}
-          className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-sm"
-        >
-          <option value="paper">Paper</option>
-          <option value="live">Live</option>
-        </select>
-
-        <StatusPill
-          label="Trading"
-          value={loading ? 'Loading' : isTrading ? 'ON' : 'OFF'}
-          variant={isTrading ? 'success' : 'danger'}
-        />
-        <StatusPill
-          label="Kill Switch"
-          value={killSwitch?.active ? 'Active' : 'Inactive'}
-          variant={killSwitch?.active ? 'danger' : killSwitch?.overrideActive ? 'warning' : 'success'}
-        />
-
-        <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={startTrading}
-            disabled={isTrading}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
-              isTrading
-                ? 'cursor-not-allowed bg-slate-600 opacity-50'
-                : 'bg-emerald-600 hover:bg-emerald-500'
-            }`}
-          >
-            Start
-          </button>
-          <button
-            type="button"
-            onClick={stopTrading}
-            disabled={!isTrading}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium text-white ${
-              !isTrading
-                ? 'cursor-not-allowed bg-slate-600 opacity-50'
-                : 'bg-red-600 hover:bg-red-500'
-            }`}
-          >
-            Stop
-          </button>
+      {/* Live Mode Confirmation Dialog */}
+      {showLiveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="max-w-sm rounded-xl border border-orange-500/50 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-orange-400">⚠️ Switch to Live Trading?</h3>
+            <p className="mt-2 text-sm text-slate-300">This will use real money. Current limits:</p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-400">
+              <li>• Max per trade: <span className="text-white font-medium">${status?.liveTrading?.maxPerTradeUsd || 3}</span></li>
+              <li>• Max exposure: <span className="text-white font-medium">${status?.liveTrading?.maxOpenExposureUsd || 10}</span></li>
+              <li>• Daily loss limit: <span className="text-white font-medium">${status?.liveTrading?.maxDailyLossUsd || 30}</span></li>
+            </ul>
+            <div className="mt-4 flex gap-3">
+              <button onClick={confirmLiveMode} className="flex-1 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500">
+                Yes, Go Live
+              </button>
+              <button onClick={() => setShowLiveConfirm(false)} className="flex-1 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-600">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* Trading Status Banner */}
+      {(() => {
+        const blockers = status?.entryDebug?.blockers || [];
+        const inCooldown = blockers.find(b => b.toLowerCase().includes('cooldown'));
+        const outsideHours = blockers.find(b => b.toLowerCase().includes('outside trading'));
+        const hasOpen = !!status?.openTrade;
+
+        let bannerColor, bannerBg, bannerBorder, dotColor, statusText, statusDetail;
+
+        if (!isTrading) {
+          bannerColor = 'text-red-400'; bannerBg = 'bg-red-950/40'; bannerBorder = 'border-red-500/30';
+          dotColor = 'bg-red-500'; statusText = 'STOPPED'; statusDetail = 'Trading is disabled';
+        } else if (hasOpen) {
+          bannerColor = 'text-blue-400'; bannerBg = 'bg-blue-950/40'; bannerBorder = 'border-blue-500/30';
+          dotColor = 'bg-blue-500'; statusText = 'IN TRADE';
+          const ot = status.openTrade;
+          statusDetail = `${ot.side} @ ${(Number(ot.entryPrice || 0) * 100).toFixed(1)}¢ | PnL: $${Number(ot.unrealizedPnl || 0).toFixed(2)}`;
+        } else if (inCooldown) {
+          const match = inCooldown.match(/(\d+)s/);
+          const secs = match ? Number(match[1]) : 0;
+          const mins = Math.floor(secs / 60);
+          const remSecs = secs % 60;
+          bannerColor = 'text-yellow-400'; bannerBg = 'bg-yellow-950/40'; bannerBorder = 'border-yellow-500/30';
+          dotColor = 'bg-yellow-500'; statusText = 'COOLDOWN';
+          statusDetail = `${mins}:${String(remSecs).padStart(2, '0')} remaining`;
+        } else if (outsideHours) {
+          bannerColor = 'text-slate-400'; bannerBg = 'bg-slate-800/60'; bannerBorder = 'border-slate-600/30';
+          dotColor = 'bg-slate-500'; statusText = 'OUTSIDE HOURS';
+          statusDetail = '6 AM – 5 PM PST';
+        } else {
+          bannerColor = 'text-emerald-400'; bannerBg = 'bg-emerald-950/40'; bannerBorder = 'border-emerald-500/30';
+          dotColor = 'bg-emerald-500'; statusText = 'TRADING';
+          statusDetail = 'Scanning for entries';
+        }
+
+        return (
+          <section className={`flex items-center gap-3 rounded-lg border ${bannerBorder} ${bannerBg} px-4 py-3`}>
+            <span className="relative flex h-3 w-3">
+              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${dotColor} opacity-75`} />
+              <span className={`relative inline-flex h-3 w-3 rounded-full ${dotColor}`} />
+            </span>
+            <span className={`text-sm font-bold uppercase tracking-wider ${bannerColor}`}>{statusText}</span>
+            <span className="text-xs text-slate-400">{statusDetail}</span>
+
+            {/* Mode Toggle */}
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                onClick={() => isLive ? changeMode({ target: { value: 'paper' } }) : setShowLiveConfirm(true)}
+                className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                  isLive ? 'bg-orange-600' : 'bg-emerald-600'
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                  isLive ? 'translate-x-8' : 'translate-x-1'
+                }`} />
+              </button>
+              <span className={`text-xs font-bold uppercase tracking-wider ${isLive ? 'text-orange-400' : 'text-emerald-400'}`}>
+                {isLive ? 'LIVE' : 'PAPER'}
+              </span>
+
+              {/* Start/Stop */}
+              <button
+                type="button"
+                onClick={isTrading ? stopTrading : startTrading}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium text-white transition-colors ${
+                  isTrading
+                    ? 'bg-red-600 hover:bg-red-500'
+                    : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                {isTrading ? 'Stop' : 'Start'}
+              </button>
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* Kill Switch Warning */}
+      {killSwitch?.active && (
+        <div className="rounded-lg border border-red-500/50 bg-red-950/30 px-4 py-2 text-sm text-red-400">
+          ⚠️ Kill switch active — trading halted due to daily loss limit
+        </div>
+      )}
 
       {/* Stats */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
