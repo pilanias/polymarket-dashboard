@@ -250,43 +250,98 @@ export default function Weather() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">City Performance</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {cityRows.map((row) => (
-            <article key={row.city} className="rounded-lg border border-slate-700 bg-slate-900 p-4">
-              <h3 className="text-sm font-semibold text-slate-200">{row.city}</h3>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <p className="text-slate-400">Trades</p>
-                <p>{String(row.trades)}</p>
-                <p className="text-slate-400">Wins</p>
-                <p>{String(row.wins)}</p>
-                <p className="text-slate-400">Losses</p>
-                <p>{String(row.losses)}</p>
-                <p className="text-slate-400">P&L</p>
-                <p className={row.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatCurrency(row.pnl)}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+        <h2 className="mb-3 text-lg font-semibold">Cities</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {(() => {
+            // Merge city performance + open positions into unified cards
+            const openByCity = {};
+            openPositions.forEach((t) => {
+              const c = String(t.city || 'Unknown');
+              if (!openByCity[c]) openByCity[c] = [];
+              openByCity[c].push(t);
+            });
 
-      <section className="rounded-lg border border-slate-700 bg-slate-900 p-4">
-        <h2 className="mb-3 text-lg font-semibold">Open Positions</h2>
-        <div className="space-y-2">
-          {openPositions.map((trade, index) => (
-            <div
-              key={String(trade.id || `${trade.city}-${index}`)}
-              className="rounded-md border border-slate-700 bg-slate-950 p-3"
-            >
-              <p className="font-medium text-slate-100">{String(trade.question || '--')}</p>
-              <p className="mt-1 text-sm text-slate-300">
-                {String(trade.city || 'Unknown')} | {String(trade.side || '--')} | Entry{' '}
-                {formatCurrency(trade.entry_price)} | Stake {formatCurrency(trade.stake_usd)} |{' '}
-                {formatDate(trade.event_date)}
-              </p>
-            </div>
-          ))}
-          {openPositions.length === 0 ? <p className="text-sm text-slate-400">No open positions.</p> : null}
+            // Build combined city list (cities with data OR open positions)
+            const cityMap = {};
+            cityRows.forEach((r) => { cityMap[r.city] = r; });
+            Object.keys(openByCity).forEach((c) => {
+              if (!cityMap[c]) cityMap[c] = { city: c, trades: 0, wins: 0, losses: 0, pnl: 0 };
+            });
+
+            // Sort: cities with open positions first, then by PnL descending
+            const sorted = Object.values(cityMap).sort((a, b) => {
+              const aOpen = (openByCity[a.city] || []).length;
+              const bOpen = (openByCity[b.city] || []).length;
+              if (aOpen && !bOpen) return -1;
+              if (!aOpen && bOpen) return 1;
+              return b.pnl - a.pnl;
+            });
+
+            return sorted.map((row) => {
+              const cityOpen = openByCity[row.city] || [];
+              const wr = row.trades > 0 ? ((row.wins / row.trades) * 100).toFixed(0) : '--';
+              const hasTrades = row.trades > 0;
+
+              return (
+                <article
+                  key={row.city}
+                  className={`rounded-lg border bg-slate-900 p-4 ${
+                    cityOpen.length > 0 ? 'border-emerald-700/50' : 'border-slate-700'
+                  }`}
+                >
+                  {/* City header row */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-200">{row.city}</h3>
+                    <div className="flex items-center gap-3 text-xs">
+                      {cityOpen.length > 0 && (
+                        <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-emerald-400">
+                          {cityOpen.length} open
+                        </span>
+                      )}
+                      {hasTrades && (
+                        <span className={row.pnl >= 0 ? 'font-semibold text-emerald-400' : 'font-semibold text-red-400'}>
+                          {formatCurrency(row.pnl)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  {hasTrades && (
+                    <div className="mt-2 flex gap-4 text-xs text-slate-400">
+                      <span>{row.wins}W / {row.losses}L</span>
+                      <span>WR: {wr}%</span>
+                      <span>{row.trades} trades</span>
+                    </div>
+                  )}
+
+                  {/* Open positions for this city */}
+                  {cityOpen.length > 0 && (
+                    <div className="mt-3 space-y-1.5 border-t border-slate-700/50 pt-2">
+                      {cityOpen.map((trade, i) => {
+                        const q = String(trade.question || '').replace(/Will the (highest|lowest) temperature in \w[\w\s]* be /i, '');
+                        return (
+                          <div key={String(trade.id || `${row.city}-${i}`)} className="flex items-center justify-between text-xs">
+                            <span className="text-slate-300 truncate max-w-[60%]" title={trade.question}>{q || '--'}</span>
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <span className={trade.side === 'YES' ? 'text-emerald-400' : 'text-red-400'}>{trade.side}</span>
+                              <span>@{Number(trade.entry_price || 0).toFixed(2)}</span>
+                              <span>{formatCurrency(trade.stake_usd)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* No data state */}
+                  {!hasTrades && cityOpen.length === 0 && (
+                    <p className="mt-2 text-xs text-slate-500">No trades yet</p>
+                  )}
+                </article>
+              );
+            });
+          })()}
         </div>
       </section>
 
