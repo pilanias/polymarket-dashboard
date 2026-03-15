@@ -6,6 +6,7 @@ import { fetchCollateralBalance } from '../live_trading/clob.js';
 import { getLiveLedger } from '../live_trading/ledger.js';
 import { getPacificTimeInfo } from '../domain/entryGate.js';
 import { getPositionSummary } from './positionService.js';
+import { getAlternatingMartingaleService } from './alternatingMartingaleService.js';
 
 // Diagnostic: unique ID per process instance + boot timestamp.
 // If the UI sees different instanceIds across consecutive polls, there are
@@ -49,6 +50,31 @@ export async function assembleStatus() {
     meta = ledgerData.meta ?? { realizedOffset: 0 };
   }
   const summary = recalculateSummary(trades);
+  let alternatingMartingale = null;
+  try {
+    alternatingMartingale = await getAlternatingMartingaleService().syncAndGet(trades);
+  } catch (err) {
+    alternatingMartingale = {
+      enabled: false,
+      reason: err?.message || String(err),
+      config: { startingCapital: 1000, baseStake: 10, entryPrice: 0.5, mode: 'realtime_from_now' },
+      totals: {
+        marketsProcessed: 0,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        bankroll: 1000,
+        netPnl: 0,
+        nextSide: 'UP',
+        nextStake: 10,
+        maxStake: 10,
+        longestLossStreak: 0,
+        halted: false,
+        haltedReason: null,
+      },
+      history: [],
+    };
+  }
 
   const starting = CONFIG.paperTrading.startingBalance ?? 1000;
   const baseRealized = typeof summary.totalPnL === 'number' ? summary.totalPnL : 0;
@@ -197,6 +223,7 @@ export async function assembleStatus() {
     orderLifecycle: engine?.executor?.orderManager?.getAllOrderViews?.() ?? [],
     reconciliation: engine?.executor?.getReconciliationStatus?.() ?? null,
     failureEvents: (engine?.executor?.getFailureEvents?.() ?? []).slice(-10),
-    runtime: globalThis.__uiStatus ?? null
+    runtime: globalThis.__uiStatus ?? null,
+    alternatingMartingale,
   };
 }
