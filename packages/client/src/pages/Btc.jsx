@@ -72,6 +72,105 @@ function getMartingaleFallback() {
       haltedReason: null,
     },
     history: [],
+function getAlternatingSide(index) {
+  return index % 2 === 0 ? 'UP' : 'DOWN';
+}
+
+function buildAlternatingMartingale(trades, { startingCapital = 1000, baseStake = 10, entryPrice = 0.5 } = {}) {
+  const closed = (trades || [])
+    .filter((trade) => String(trade.status || '').toUpperCase() === 'CLOSED')
+    .sort((a, b) => parseTimestamp(a) - parseTimestamp(b));
+
+  const markets = [];
+  const seen = new Set();
+  for (const trade of closed) {
+    const slug = String(trade.marketSlug || '').trim();
+    if (!slug || seen.has(slug)) continue;
+    const settlement = String(trade.settlementSide || '').toUpperCase();
+    if (settlement !== 'UP' && settlement !== 'DOWN') continue;
+    seen.add(slug);
+    markets.push({
+      marketSlug: slug,
+      settlementSide: settlement,
+      settledAt: trade.exitTime || trade.timestamp || trade.updatedAt || trade.entryTime || null,
+    });
+  }
+
+  let bankroll = Number(startingCapital);
+  let stake = Number(baseStake);
+  let maxStake = stake;
+  let wins = 0;
+  let losses = 0;
+  let longestLossStreak = 0;
+  let currentLossStreak = 0;
+  let haltedAt = null;
+
+  const history = [];
+  for (let i = 0; i < markets.length; i += 1) {
+    const m = markets[i];
+    const side = getAlternatingSide(i);
+
+    if (bankroll < stake) {
+      haltedAt = {
+        index: i,
+        marketSlug: m.marketSlug,
+        requiredStake: stake,
+        bankroll,
+      };
+      break;
+    }
+
+    const won = side === m.settlementSide;
+    const betStake = stake;
+    const pnl = won ? betStake : -betStake;
+    bankroll += pnl;
+
+    if (won) {
+      wins += 1;
+      currentLossStreak = 0;
+      stake = Number(baseStake);
+    } else {
+      losses += 1;
+      currentLossStreak += 1;
+      longestLossStreak = Math.max(longestLossStreak, currentLossStreak);
+      stake *= 2;
+      maxStake = Math.max(maxStake, stake);
+    }
+
+    history.push({
+      idx: i + 1,
+      marketSlug: m.marketSlug,
+      side,
+      settlementSide: m.settlementSide,
+      won,
+      stake: betStake,
+      pnl,
+      bankroll,
+      settledAt: m.settledAt,
+    });
+  }
+
+  const executed = history.length;
+  const nextSide = getAlternatingSide(executed);
+  const nextStake = stake;
+
+  return {
+    config: { startingCapital, baseStake, entryPrice },
+    totals: {
+      marketsDetected: markets.length,
+      marketsExecuted: executed,
+      wins,
+      losses,
+      winRate: executed > 0 ? (wins / executed) * 100 : 0,
+      bankroll,
+      netPnl: bankroll - startingCapital,
+      maxStake,
+      longestLossStreak,
+      nextStake,
+      nextSide,
+      haltedAt,
+    },
+    history,
   };
 }
 
@@ -297,6 +396,11 @@ export default function Btc() {
 
   const gateChecks = useMemo(() => buildGateChecks(status), [status]);
   const altMartingale = status?.alternatingMartingale || getMartingaleFallback();
+  const altMartingale = useMemo(() => buildAlternatingMartingale(paperTrades || [], {
+    startingCapital: 1000,
+    baseStake: 10,
+    entryPrice: 0.5,
+  }), [paperTrades]);
 
   return (
     <div className="space-y-6">
@@ -469,6 +573,11 @@ export default function Btc() {
           </div>
           <div className="rounded-md border border-indigo-400/30 bg-indigo-900/40 px-3 py-2 text-xs text-indigo-100">
             Markets processed: <span className="font-semibold">{altMartingale.totals.marketsProcessed}</span>
+              Rules: buy before each market at 50¢, alternate <span className="font-semibold">UP/DOWN</span>, start stake at <span className="font-semibold">$10</span>, double after every loss, reset after win. Starting capital is <span className="font-semibold">$1,000</span>.
+            </p>
+          </div>
+          <div className="rounded-md border border-indigo-400/30 bg-indigo-900/40 px-3 py-2 text-xs text-indigo-100">
+            Markets replayed: <span className="font-semibold">{altMartingale.totals.marketsExecuted}</span> / {altMartingale.totals.marketsDetected}
           </div>
         </div>
 
@@ -503,6 +612,10 @@ export default function Btc() {
             Configure Supabase and run `supabase/alternating-martingale-schema.sql`.
           </p>
         )}
+
+            <p className="text-xs text-slate-400">{altMartingale.totals.haltedAt ? `Halted: needed ${formatCurrency(altMartingale.totals.haltedAt.requiredStake)} with ${formatCurrency(altMartingale.totals.haltedAt.bankroll)} left` : 'No capital halt in replay'}</p>
+          </div>
+        </div>
 
         {altMartingale.history.length > 0 && (
           <div className="mt-4 overflow-x-auto rounded-md border border-indigo-400/20">
