@@ -1,7 +1,17 @@
 import { CONFIG } from '../config.js';
-import { getClobClient } from '../live_trading/clob.js';
+import { getClobClient, hasLiveCredentials } from '../live_trading/clob.js';
 import { computePositionsFromTrades, enrichPositionsWithMarks } from '../live_trading/positions.js';
 import { computeRealizedPnlAvgCost } from '../live_trading/pnl.js';
+
+function ensureLiveReady() {
+  if (!hasLiveCredentials()) {
+    return {
+      ready: false,
+      reason: 'missing_live_credentials',
+    };
+  }
+  return { ready: true, reason: null };
+}
 
 export function withTimeout(promise, ms, label = 'operation') {
   return Promise.race([
@@ -16,17 +26,35 @@ export function dayKeyFromEpochSec(epochSec, tz = 'America/Los_Angeles') {
 }
 
 export async function fetchLiveTrades() {
+  const readiness = ensureLiveReady();
+  if (!readiness.ready) return [];
+
   const client = getClobClient();
   const trades = await client.getTrades();
   return Array.isArray(trades) ? trades : [];
 }
 
 export async function fetchLiveOpenOrders() {
+  const readiness = ensureLiveReady();
+  if (!readiness.ready) return [];
+
   const client = getClobClient();
   return withTimeout(client.getOpenOrders(), 6000, 'getOpenOrders');
 }
 
 export async function fetchLivePositions() {
+  const readiness = ensureLiveReady();
+  if (!readiness.ready) {
+    return {
+      count: 0,
+      tradableCount: 0,
+      nonTradableCount: 0,
+      tradable: [],
+      nonTradable: [],
+      unavailableReason: readiness.reason,
+    };
+  }
+
   const client = getClobClient();
   const trades = await client.getTrades();
   const positions = computePositionsFromTrades(trades);
@@ -45,6 +73,26 @@ export async function fetchLivePositions() {
 }
 
 export async function fetchLiveAnalytics() {
+  const readiness = ensureLiveReady();
+  if (!readiness.ready) {
+    const tz = process.env.UI_TZ || 'America/Los_Angeles';
+    const todayKey = dayKeyFromEpochSec(Math.floor(Date.now() / 1000), tz);
+    return {
+      tz,
+      todayKey,
+      yesterdayKey: null,
+      tradesCount: 0,
+      realizedTotal: 0,
+      realizedTodayRaw: 0,
+      dailyLossBaselineUsd: Number(CONFIG.liveTrading?.dailyLossBaselineUsd ?? 0) || 0,
+      realizedToday: 0,
+      realizedYesterday: 0,
+      inventoryByToken: {},
+      realizedByToken: {},
+      unavailableReason: readiness.reason,
+    };
+  }
+
   const client = getClobClient();
   const trades = await client.getTrades();
 

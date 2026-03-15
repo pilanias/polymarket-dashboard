@@ -51,6 +51,30 @@ function buildPnlSeries(trades) {
   });
 }
 
+
+function getMartingaleFallback() {
+  return {
+    enabled: false,
+    reason: 'not_available',
+    config: { startedAt: null, startingCapital: 1000, baseStake: 10, entryPrice: 0.5, mode: 'realtime_from_now' },
+    totals: {
+      marketsProcessed: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      bankroll: 1000,
+      netPnl: 0,
+      nextSide: 'UP',
+      nextStake: 10,
+      maxStake: 10,
+      longestLossStreak: 0,
+      halted: false,
+      haltedReason: null,
+    },
+    history: [],
+  };
+}
+
 /** Build gate status rows: [check, current, required, pass] */
 function buildGateChecks(status) {
   if (!status) return [];
@@ -272,6 +296,7 @@ export default function Btc() {
   const chartData = buildPnlSeries(sortedTrades);
 
   const gateChecks = useMemo(() => buildGateChecks(status), [status]);
+  const altMartingale = status?.alternatingMartingale || getMartingaleFallback();
 
   return (
     <div className="space-y-6">
@@ -431,6 +456,85 @@ export default function Btc() {
           )}
         </section>
       )}
+
+
+      {/* Alternating Martingale Panel */}
+      <section className="rounded-lg border border-indigo-500/40 bg-indigo-950/20 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-300">Alternating 50¢ Martingale (Paper Replay)</h3>
+            <p className="mt-1 text-xs text-indigo-200/80">
+              Rules: buy before each market at 50¢, alternate <span className="font-semibold">UP/DOWN</span>, start stake at <span className="font-semibold">$10</span>, double after every loss, reset after win. Starting capital is <span className="font-semibold">$1,000</span>. Tracking starts from service start (real-time), not backfill replay.
+            </p>
+          </div>
+          <div className="rounded-md border border-indigo-400/30 bg-indigo-900/40 px-3 py-2 text-xs text-indigo-100">
+            Markets processed: <span className="font-semibold">{altMartingale.totals.marketsProcessed}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-md border border-indigo-400/20 bg-slate-900/60 p-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Strategy Bankroll</p>
+            <p className={`mt-1 text-lg font-semibold ${altMartingale.totals.netPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {formatCurrency(altMartingale.totals.bankroll)}
+            </p>
+            <p className="text-xs text-slate-400">Net: {formatCurrency(altMartingale.totals.netPnl)}</p>
+          </div>
+          <div className="rounded-md border border-indigo-400/20 bg-slate-900/60 p-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Win / Loss</p>
+            <p className="mt-1 text-lg font-semibold text-slate-100">{altMartingale.totals.wins} / {altMartingale.totals.losses}</p>
+            <p className="text-xs text-slate-400">Win rate: {altMartingale.totals.winRate.toFixed(1)}%</p>
+          </div>
+          <div className="rounded-md border border-indigo-400/20 bg-slate-900/60 p-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Next Bet</p>
+            <p className="mt-1 text-lg font-semibold text-indigo-300">{altMartingale.totals.nextSide} • {formatCurrency(altMartingale.totals.nextStake)}</p>
+            <p className="text-xs text-slate-400">Max stake reached: {formatCurrency(altMartingale.totals.maxStake)}</p>
+          </div>
+          <div className="rounded-md border border-indigo-400/20 bg-slate-900/60 p-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Risk Marker</p>
+            <p className="mt-1 text-lg font-semibold text-slate-100">Longest loss streak: {altMartingale.totals.longestLossStreak}</p>
+            <p className="text-xs text-slate-400">{altMartingale.totals.halted ? (altMartingale.totals.haltedReason || 'Insufficient bankroll for next bet') : 'No capital halt yet'}</p>
+          </div>
+        </div>
+
+        {!altMartingale.enabled && (
+          <p className="mt-3 text-xs text-yellow-300">
+            Strategy persistence unavailable: {String(altMartingale.reason || 'unknown')}.
+            Configure Supabase and run `supabase/alternating-martingale-schema.sql`.
+          </p>
+        )}
+
+        {altMartingale.history.length > 0 && (
+          <div className="mt-4 overflow-x-auto rounded-md border border-indigo-400/20">
+            <table className="min-w-full text-xs">
+              <thead className="bg-slate-900 text-left text-slate-300">
+                <tr>
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">Market</th>
+                  <th className="px-3 py-2">Bet</th>
+                  <th className="px-3 py-2">Settlement</th>
+                  <th className="px-3 py-2">Stake</th>
+                  <th className="px-3 py-2">PnL</th>
+                  <th className="px-3 py-2">Bankroll</th>
+                </tr>
+              </thead>
+              <tbody>
+                {altMartingale.history.slice(-8).reverse().map((row) => (
+                  <tr key={`${row.marketSlug}-${row.idx}`} className="border-t border-slate-800 bg-slate-950/60">
+                    <td className="px-3 py-2 text-slate-400">{row.idx}</td>
+                    <td className="px-3 py-2 text-slate-200">{row.marketSlug.replace('btc-updown-5m-', '5m-')}</td>
+                    <td className={`px-3 py-2 font-medium ${row.side === 'UP' ? 'text-emerald-400' : 'text-red-400'}`}>{row.side}</td>
+                    <td className="px-3 py-2 text-slate-300">{row.settlementSide}</td>
+                    <td className="px-3 py-2 text-slate-200">{formatCurrency(Math.abs(row.pnl))}</td>
+                    <td className={`px-3 py-2 font-semibold ${row.won ? 'text-emerald-400' : 'text-red-400'}`}>{row.won ? '+' : '-'}{formatCurrency(Math.abs(row.pnl))}</td>
+                    <td className="px-3 py-2 text-slate-100">{formatCurrency(row.bankroll)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Active Trade */}
       {status?.openTrade && (
