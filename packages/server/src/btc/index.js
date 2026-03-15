@@ -93,7 +93,7 @@ function computeIndicators(klines1m, currentPrice) {
   data.heikenColor = haCC.color;
   data.heikenCount = haCC.count;
   data.failedVwapReclaim = data.vwapNow !== null && data.vwapSeries.length >= 3
-    ? closes[closes.length - 1] < data.vwapNow && data.vwapSeries[data.vwapSeries.length - 2] > data.vwapSeries[data.vwapSeries.length - 2]
+    ? closes[closes.length - 1] < data.vwapNow && closes[closes.length - 2] > data.vwapSeries[data.vwapSeries.length - 2]
     : false;
   data.vwapCrossCount = countVwapCrosses(closes, data.vwapSeries, 20);
 
@@ -461,7 +461,9 @@ export async function startApp({ skipServer = false } = {}) {
     // Fetch Live BTC Price Data ---
     // Primary: Chainlink WS (if configured)
     const chainlinkTick = chainlinkStream.getLast?.() ?? null;
-    if (chainlinkTick?.price) currentPrice = chainlinkTick.price;
+    const wsAgeMs = chainlinkTick?.updatedAt ? (Date.now() - Number(chainlinkTick.updatedAt)) : null;
+    const wsFresh = typeof wsAgeMs === 'number' && Number.isFinite(wsAgeMs) && wsAgeMs >= 0 && wsAgeMs < 15_000;
+    if (chainlinkTick?.price && wsFresh) currentPrice = chainlinkTick.price;
 
     // Fallback: Chainlink REST (reliable) + feed candle builder
     if (currentPrice === null) {
@@ -484,6 +486,12 @@ export async function startApp({ skipServer = false } = {}) {
     if (currentPrice === null) {
       try { currentPrice = await klineProvider.fetchLastPrice(); }
       catch (restErr) { console.error(`REST price fetch failed: ${restErr.message}`); }
+    }
+
+    // Keep 1m candle builder moving even if WS is stale/disconnected.
+    // This prevents RSI/VWAP/Heiken from freezing indefinitely.
+    if (typeof currentPrice === 'number' && Number.isFinite(currentPrice)) {
+      pushChainlinkTick({ price: currentPrice, updatedAt: Date.now() });
     }
 
     // --- 1m Candle Data for indicators ---
