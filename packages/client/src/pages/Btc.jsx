@@ -52,6 +52,26 @@ function buildPnlSeries(trades) {
 }
 
 
+function getMartingaleFallback() {
+  return {
+    enabled: false,
+    reason: 'not_available',
+    config: { startedAt: null, startingCapital: 1000, baseStake: 10, entryPrice: 0.5, mode: 'realtime_from_now' },
+    totals: {
+      marketsProcessed: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      bankroll: 1000,
+      netPnl: 0,
+      nextSide: 'UP',
+      nextStake: 10,
+      maxStake: 10,
+      longestLossStreak: 0,
+      halted: false,
+      haltedReason: null,
+    },
+    history: [],
 function getAlternatingSide(index) {
   return index % 2 === 0 ? 'UP' : 'DOWN';
 }
@@ -375,6 +395,7 @@ export default function Btc() {
   const chartData = buildPnlSeries(sortedTrades);
 
   const gateChecks = useMemo(() => buildGateChecks(status), [status]);
+  const altMartingale = status?.alternatingMartingale || getMartingaleFallback();
   const altMartingale = useMemo(() => buildAlternatingMartingale(paperTrades || [], {
     startingCapital: 1000,
     baseStake: 10,
@@ -547,6 +568,11 @@ export default function Btc() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-300">Alternating 50¢ Martingale (Paper Replay)</h3>
             <p className="mt-1 text-xs text-indigo-200/80">
+              Rules: buy before each market at 50¢, alternate <span className="font-semibold">UP/DOWN</span>, start stake at <span className="font-semibold">$10</span>, double after every loss, reset after win. Starting capital is <span className="font-semibold">$1,000</span>. Tracking starts from service start (real-time), not backfill replay.
+            </p>
+          </div>
+          <div className="rounded-md border border-indigo-400/30 bg-indigo-900/40 px-3 py-2 text-xs text-indigo-100">
+            Markets processed: <span className="font-semibold">{altMartingale.totals.marketsProcessed}</span>
               Rules: buy before each market at 50¢, alternate <span className="font-semibold">UP/DOWN</span>, start stake at <span className="font-semibold">$10</span>, double after every loss, reset after win. Starting capital is <span className="font-semibold">$1,000</span>.
             </p>
           </div>
@@ -576,6 +602,17 @@ export default function Btc() {
           <div className="rounded-md border border-indigo-400/20 bg-slate-900/60 p-3">
             <p className="text-xs uppercase tracking-wide text-slate-400">Risk Marker</p>
             <p className="mt-1 text-lg font-semibold text-slate-100">Longest loss streak: {altMartingale.totals.longestLossStreak}</p>
+            <p className="text-xs text-slate-400">{altMartingale.totals.halted ? (altMartingale.totals.haltedReason || 'Insufficient bankroll for next bet') : 'No capital halt yet'}</p>
+          </div>
+        </div>
+
+        {!altMartingale.enabled && (
+          <p className="mt-3 text-xs text-yellow-300">
+            Strategy persistence unavailable: {String(altMartingale.reason || 'unknown')}.
+            Configure Supabase and run `supabase/alternating-martingale-schema.sql`.
+          </p>
+        )}
+
             <p className="text-xs text-slate-400">{altMartingale.totals.haltedAt ? `Halted: needed ${formatCurrency(altMartingale.totals.haltedAt.requiredStake)} with ${formatCurrency(altMartingale.totals.haltedAt.bankroll)} left` : 'No capital halt in replay'}</p>
           </div>
         </div>
